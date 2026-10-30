@@ -82,6 +82,7 @@ import dev.horizon.client.module.legit.CrystalBind
 import dev.horizon.client.module.legit.LegitTotem
 import dev.horizon.client.module.legit.Reach
 import dev.horizon.client.module.misc.AntiResourcePack
+import dev.horizon.client.module.misc.Announce
 import dev.horizon.client.module.misc.AutoEat
 import dev.horizon.client.module.misc.AutoEz
 import dev.horizon.client.module.misc.AutoLeave
@@ -376,5 +377,6 @@ object HorizonModules {
         Modules.register(HuntMap())
         Modules.register(PortalPatternFinder())
         Modules.register(TunnelEsp())
+        Modules.register(Announce())
     }
 }

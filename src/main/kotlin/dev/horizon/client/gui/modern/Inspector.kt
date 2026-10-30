@@ -324,7 +324,7 @@ internal object Inspector {
             }
             is StringSetting -> {
                 label(s, lx, cy, w - 20f)
-                val f = fields.getOrPut(s) { Ui.Field(s.value, 120) { t -> s.value = t } }
+                val f = fields.getOrPut(s) { Ui.Field(s.value, 256) { t -> s.value = t } }
                 if (Ui.focused !== f) f.text = s.value
                 val fy = y + 20f
                 val focused = Ui.focused === f
