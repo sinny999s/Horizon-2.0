@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.rage1",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "DeltaTrackerTimerMixin",
+    "LocalPlayerMoveMixin",
+    "BlockSlowdownMixin",
+    "WebBlockMixin",
+    "SweetBerryBushBlockMixin",
+    "SlimeBlockMixin",
+    "PlayerRidingMixin",
+    "AbstractContainerMenuMixin",
+    "GuiScreenMixin",
+    "EntityPoseMixin",
+    "LivingEntityTravelMixin",
+    "FireworkVelocityMixin",
+    "MovePacketAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

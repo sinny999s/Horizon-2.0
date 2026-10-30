@@ -1,0 +1,23 @@
+# Example test: Portal ESP finds a portal lit near the player and posts it in chat.
+# Setup:  python tools/testcfg.py setup portal-esp
+# Run:    sh tools/run-test.sh tools/examples/portal-esp.txt
+# Check:  "Test passed" (the portal exists), a "[Portal Esp] Portal at" chat line in tools/test-out/portal-esp.log,
+#         and the screenshot tools/test-out/portal-esp/portal.png.
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule send_command_feedback true
+cmd gamerule advance_time false
+cmd gamerule spawn_mobs false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 60
+cmd fill 2002 -60 2012 2005 -56 2012 obsidian
+cmd fill 2003 -59 2012 2004 -57 2012 nether_portal[axis=x]
+wait 40
+cmd execute if block 2003 -59 2012 nether_portal
+wait 20
+shot portal
+wait 5
+quit

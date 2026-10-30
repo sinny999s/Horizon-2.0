@@ -1,0 +1,17 @@
+# Setup: python tools/testcfg.py setup stash-finder (run stash-finder-once-1 then -2 before restoring)
+# Check: one "[Stash] Found" line in the log.
+# Stash Finder: one alert for a stash, none after a trip to the nether and back.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback true
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd fill 2003 -60 2005 2007 -60 2005 shulker_box
+wait 40
+cmd execute in minecraft:the_nether run tp @s 250 100 250
+wait 80
+cmd execute in minecraft:overworld run tp @s 2000.5 -60 2000.5 0 0
+wait 80
+shot back
+quit

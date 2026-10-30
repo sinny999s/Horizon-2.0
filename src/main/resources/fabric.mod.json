@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "horizon",
+  "version": "${version}",
+  "name": "Horizon",
+  "description": "Next-generation utility & exploration client tailored for modern Minecraft anarchy. Features a sleek glassmorphic interface, intelligent base & stash hunting suites, high-precision combat systems, and advanced dimension navigation.",
+  "license": "All Rights Reserved",
+  "icon": "assets/horizon/icon.png",
+  "authors": [
+    "sinny999s"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      {
+        "adapter": "kotlin",
+        "value": "dev.horizon.client.HorizonClient"
+      }
+    ],
+    "preLaunch": [
+      {
+        "adapter": "kotlin",
+        "value": "dev.horizon.client.PreLaunch"
+      }
+    ]
+  },
+  "mixins": [
+    "horizon.mixins.json",
+    "horizon.basic.mixins.json",
+    "horizon.rage1.mixins.json",
+    "horizon.rage2.mixins.json",
+    "horizon.cosmetic1.mixins.json",
+    "horizon.cosmetic2.mixins.json",
+    "horizon.esp1.mixins.json",
+    "horizon.esp2.mixins.json",
+    "horizon.equip.mixins.json",
+    "horizon.misc1.mixins.json",
+    "horizon.misc2.mixins.json",
+    "horizon.player1.mixins.json",
+    "horizon.player2.mixins.json",
+    "horizon.world.mixins.json",
+    "horizon.pvp.mixins.json",
+    "horizon.legit.mixins.json",
+    "horizon.deps.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "fabric-api": "*",
+    "fabric-language-kotlin": ">=1.14.2+kotlin.2.4.21",
+    "minecraft": "26.3"
+  }
+}

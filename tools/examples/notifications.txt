@@ -1,0 +1,24 @@
+# Notifications (the Notifications widget on): Full Bright off and on, two plates under the crosshair, the newest on
+# top; with UI's style = New in the widgets' new look.
+# Setup:  python tools/testcfg.py setup UI 'bind={"key":12,"hold":false,"mouse":false}' style=NEW -- full-bright 'bind={"key":14,"hold":false,"mouse":false}'
+#         python tools/examples/hud-seed.py
+# Run:    sh tools/run-test.sh tools/examples/notifications.txt
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 200
+key K
+wait 10
+key K
+wait 3
+shot popping
+wait 12
+shot notifications
+wait 60
+shot gone
+quit

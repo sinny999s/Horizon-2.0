@@ -1,0 +1,41 @@
+# The owner's real HUD at their screen (1080p, GUI scale 2 = 960x540), with gear and effects so every widget has something
+# to show: in play, then with chat open, where the widgets with nothing to show draw their placeholders. hudlog prints
+# each widget's place and size.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 60
+cmd gamemode survival
+cmd give @s totem_of_undying 3
+cmd give @s end_crystal 192
+cmd give @s experience_bottle 128
+cmd give @s enchanted_golden_apple 12
+cmd give @s firework_rocket 128
+cmd give @s elytra 1
+cmd give @s diamond_pickaxe 1
+cmd give @s diamond_sword 1
+cmd give @s obsidian 64
+cmd item replace entity @s armor.head with netherite_helmet
+cmd item replace entity @s armor.chest with netherite_chestplate[damage=300]
+cmd item replace entity @s armor.legs with netherite_leggings[damage=150]
+cmd item replace entity @s armor.feet with netherite_boots
+cmd effect give @s strength 2000 1
+cmd effect give @s speed 2000 1
+cmd effect give @s fire_resistance 4800 0
+fakeplayer Steve 2006.5 -60 2006.5
+wait 240
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 20
+shot hud
+hudlog
+key Y
+wait 30
+shot chat
+hudlog
+key ESCAPE
+wait 5
+quit

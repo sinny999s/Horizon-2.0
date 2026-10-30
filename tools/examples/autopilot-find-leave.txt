@@ -1,0 +1,28 @@
+# Setup: python tools/testcfg.py setup elytra-autopilot 'bind={"key":14,"hold":false,"mouse":false}' target=COORDS 'coords=2000 2450' on-find=CIRCLE circle-time=8 height=-20 clearance=20 -- base-finder
+# Check: "Circling the stash", "Done circling", then "Leaving: Watcher came within" and the [Horizon] disconnect.
+# Elytra Autopilot, COORDS 2000 2450 with on-find CIRCLE: circles a stash placed mid-flight, arrives, circles, and
+# leaves when a (fake) player shows up.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback true
+cmd time set noon
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd kill @e[type=!player]
+cmd gamemode survival
+cmd clear @s
+cmd item replace entity @s armor.chest with minecraft:elytra
+cmd item replace entity @s hotbar.8 with minecraft:firework_rocket 64
+wait 20
+key K
+wait 60
+cmd fill 1998 -60 2150 2003 -60 2150 shulker_box
+wait 60
+shot circling
+wait 260
+shot arrived
+cmd data get entity @s Pos
+fakeplayer Watcher 2000.5 -20 2450.5 0
+wait 40
+quit

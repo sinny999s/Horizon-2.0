@@ -1,0 +1,38 @@
+# The Cape module's list of capes, and Inventory Manager's kit editor on its own screen now the old ClickGUI is gone.
+# Setup:  python tools/testcfg.py setup UI 'bind={"key":12,"hold":false,"mouse":false}'
+# Run:    sh tools/run-test.sh tools/examples/horizon-popups.txt
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 60
+key I
+wait 40
+click 770 129
+wait 5
+type cape
+wait 20
+click 770 198
+wait 30
+shot cape
+click 1360 348
+wait 20
+shot cape-list
+key ESCAPE
+wait 10
+click 240 588
+wait 20
+click 560 625 R
+wait 30
+shot inventory-manager
+click 1233 332
+wait 30
+shot kit-editor
+key ESCAPE
+wait 30
+shot back-to-gui
+quit

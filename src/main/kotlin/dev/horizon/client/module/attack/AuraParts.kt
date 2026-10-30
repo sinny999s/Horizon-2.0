@@ -1,0 +1,357 @@
+package dev.horizon.client.module.attack
+
+import dev.horizon.client.combat.Inventory
+import dev.horizon.client.combat.PlayerState
+import dev.horizon.client.combat.Scheduler
+import dev.horizon.client.combat.Rotation
+import dev.horizon.client.event.ReceivePacketEvent
+import dev.horizon.client.module.Modules
+import dev.horizon.client.render.Ghost
+import dev.horizon.client.module.protect.Offhand
+import net.minecraft.client.Minecraft
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
+import net.minecraft.core.component.DataComponents
+import net.minecraft.core.registries.Registries
+import net.minecraft.network.protocol.Packet
+import net.minecraft.network.protocol.common.ClientboundDisconnectPacket
+import net.minecraft.network.protocol.game.ClientGamePacketListener
+import net.minecraft.network.protocol.game.ClientboundBossEventPacket
+import net.minecraft.network.protocol.game.ClientboundEntityPositionSyncPacket
+import net.minecraft.network.protocol.game.ClientboundMoveEntityPacket
+import net.minecraft.network.protocol.game.ClientboundPlayerPositionPacket
+import net.minecraft.network.protocol.game.ClientboundSetActionBarTextPacket
+import net.minecraft.network.protocol.game.ClientboundSetHealthPacket
+import net.minecraft.network.protocol.game.ClientboundSetTimePacket
+import net.minecraft.network.protocol.game.ClientboundSoundPacket
+import net.minecraft.network.protocol.game.ClientboundStopSoundPacket
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket
+import net.minecraft.network.protocol.game.ClientboundTeleportEntityPacket
+import net.minecraft.network.protocol.game.VecDeltaCodec
+import net.minecraft.tags.ItemTags
+import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.EntitySelector
+import net.minecraft.world.entity.EquipmentSlotGroup
+import net.minecraft.world.entity.player.Player
+import net.minecraft.world.entity.projectile.ProjectileUtil
+import net.minecraft.world.inventory.ContainerInput
+import net.minecraft.world.item.ItemStack
+import net.minecraft.world.item.ItemUseAnimation
+import net.minecraft.world.item.Items
+import net.minecraft.world.item.MaceItem
+import net.minecraft.world.item.TridentItem
+import net.minecraft.world.item.enchantment.EnchantmentHelper
+import net.minecraft.world.item.enchantment.Enchantments
+import net.minecraft.world.level.ClipContext
+import net.minecraft.world.phys.BlockHitResult
+import net.minecraft.world.phys.EntityHitResult
+import net.minecraft.world.phys.HitResult
+import net.minecraft.util.Mth
+import net.minecraft.world.phys.Vec3
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.max
+import kotlin.math.sqrt
+
+private val mc get() = Minecraft.getInstance()
+
+/** The original's `gy`: something Aura runs every tick, before each hit and after it. */
+interface AuraHook {
+    fun tick() {}
+
+    fun pre() {}
+
+    fun post(rotation: Rotation) {}
+}
+
+/** The original's `sm` (`while-shielding`): lower a raised shield for the hit; UNPRESS raises it again straight after. */
+class ShieldHook(private val aura: Aura) : AuraHook {
+    private var blocking = false
+
+    override fun pre() {
+        val p = mc.player ?: return
+        blocking = p.isUsingItem && p.useItem.useAnimation == ItemUseAnimation.BLOCK
+        val mode = aura.whileShielding.value
+        if (blocking && (mode == Aura.WhileShielding.UNPRESS || mode == Aura.WhileShielding.LEGIT)) mc.gameMode?.releaseUsingItem(p)
+    }
+
+    override fun post(rotation: Rotation) {
+        val p = mc.player ?: return
+        if (blocking && aura.whileShielding.value == Aura.WhileShielding.UNPRESS) mc.gameMode?.useItem(p, InteractionHand.OFF_HAND)
+    }
+}
+
+/** The original's `he` (`auto-weapon`, `only-weapon`). */
+class WeaponHook(private val aura: Aura) : AuraHook {
+    private var saved = -1
+
+    /** The original's `he.a`: the only-weapon gate. */
+    fun gate(): Boolean {
+        if (!aura.onlyWeapon.value) return true
+        val p = mc.player ?: return false
+        if (aura.autoWeapon.value == Aura.AutoWeapon.NONE) return isWeapon(p.mainHandItem)
+        return Inventory.hotbarFind { it.`is`(ItemTags.SWORDS) } != null || Inventory.hotbarFind { it.`is`(ItemTags.AXES) } != null
+    }
+
+    private fun isWeapon(s: ItemStack) =
+        s.`is`(ItemTags.SWORDS) || s.`is`(ItemTags.AXES) || s.item is TridentItem || s.item is MaceItem
+
+    /** The original's `he.x`: the best sword in the hotbar (durability + Sharpness), else the best axe. */
+    fun selectBest() {
+        val slot = best(ItemTags.SWORDS) ?: best(ItemTags.AXES) ?: return
+        Inventory.selectHotbar(slot)
+    }
+
+    private fun best(tag: net.minecraft.tags.TagKey<net.minecraft.world.item.Item>): Int? {
+        val p = mc.player ?: return null
+        val level = mc.level ?: return null
+        val sharpness = level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT).getOrThrow(Enchantments.SHARPNESS)
+        var best: Int? = null
+        var bestScore = 1.0f
+        for (i in 0..8) {
+            val s = p.inventory.getItem(i)
+            if (!s.`is`(tag)) continue
+            val score = (s.get(DataComponents.MAX_DAMAGE) ?: 0) + EnchantmentHelper.getItemEnchantmentLevel(sharpness, s).toFloat()
+            if (score > bestScore) {
+                best = i
+                bestScore = score
+            }
+        }
+        return best
+    }
+
+    override fun tick() = restore()
+
+    override fun pre() {
+        if (aura.autoWeapon.value != Aura.AutoWeapon.SILENT) return
+        saved = Inventory.selected
+        selectBest()
+    }
+
+    override fun post(rotation: Rotation) = restore()
+
+    private fun restore() {
+        if (saved == -1) return
+        Inventory.selectHotbar(saved)
+        saved = -1
+    }
+}
+
+/** The original's `uu` (`offhand-hit-swap`): the best off-hand attack-damage item goes to the off-hand for the hit. */
+class OffhandSwapHook(private val aura: Aura) : AuraHook {
+    private var swapIn: (() -> Unit)? = null
+    private var swapBack: (() -> Unit)? = null
+
+    /** The original's `uu.K`: the inventory index with the strongest off-hand attack-damage modifier, or −1. */
+    fun find(): Int {
+        val p = mc.player ?: return -1
+        var best = -1
+        var bestAmount = 0.0
+        for (i in 0..36) {
+            val s = if (i == 36) p.offhandItem else p.inventory.getItem(i)
+            val mods = s.get(DataComponents.ATTRIBUTE_MODIFIERS) ?: continue
+            for (e in mods.modifiers()) {
+                if (e.slot() != EquipmentSlotGroup.OFFHAND || !e.attribute().value().descriptionId.contains("attack_damage")) continue
+                if (e.modifier().amount() > bestAmount) {
+                    bestAmount = e.modifier().amount()
+                    best = i
+                }
+            }
+        }
+        return if (best == 36) -1 else best
+    }
+
+    /** The original's `uu.U`: line up the swap in (end of this tick) and the swap back (after the hit). */
+    fun schedule() {
+        if (!aura.offhandHitSwap.value) return
+        val slot = find()
+        if (slot == -1 || mc.gui.screen() is net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen) return
+        val notContainer = mc.gui.screen() !is net.minecraft.client.gui.screens.inventory.ContainerScreen
+        val slotId = if (slot < 9) slot + 36 else slot
+        PlayerState.releaseMovementKeys()
+        Scheduler.ticks(2) { PlayerState.resyncMovementKeys() }
+        val swap = {
+            val p = mc.player
+            if (p != null) {
+                if (!p.containerMenu.carried.isEmpty) mc.gameMode?.handleContainerInput(p.containerMenu.containerId, -999, 0, ContainerInput.PICKUP, p)
+                Inventory.swap(slotId, 40, notContainer)
+                Modules.get<Offhand>().swapCooldown = 15
+            }
+        }
+        swapIn = swap
+        swapBack = swap
+    }
+
+    /** At the end of the client tick. */
+    fun postTick() {
+        swapIn?.invoke()
+        swapIn = null
+    }
+
+    override fun post(rotation: Rotation) {
+        swapBack?.invoke()
+        swapBack = null
+        Modules.get<Offhand>().swapCooldown = 1
+        PlayerState.resyncMovementKeys()
+    }
+}
+
+/**
+ * The original's `ht` (`back-track`): while the target is a player, hold incoming packets back so it stays where it was,
+ * as long as that is farther from us than where it is now; let them go after `move-delay` ms.
+ */
+class BackTrack(private val aura: Aura) {
+    var player: Player? = null
+        private set
+
+    /** The latest server position, and the one before (for the render). */
+    var latest: Vec3? = null
+        private set
+    var previous: Vec3? = null
+        private set
+    var lastMove = 0L
+        private set
+
+    private class Delayed(val packet: Packet<*>, val time: Long)
+
+    private val delayed = ConcurrentLinkedQueue<Delayed>()
+    private val ready = ConcurrentLinkedQueue<Packet<*>>()
+
+    /** Each Aura tick, before the target is chosen. */
+    fun update() {
+        val t = if (aura.enabled) aura.target as? Player else null
+        if (t == null) {
+            flush()
+            return
+        }
+        if (t !== player) {
+            flush()
+            latest = t.position()
+        }
+        player = t
+    }
+
+    fun receive(e: ReceivePacketEvent) {
+        val p = player
+        if (delayed.isEmpty() && ready.isEmpty() && (p == null || !p.isAlive)) return
+        val pk = e.packet
+        if (pk is ClientboundSystemChatPacket || pk is ClientboundSetTimePacket || pk is ClientboundSoundPacket ||
+            pk is ClientboundStopSoundPacket || pk is ClientboundSetActionBarTextPacket || pk is ClientboundSetHealthPacket ||
+            pk is ClientboundBossEventPacket) return
+        if (pk is ClientboundPlayerPositionPacket || pk is ClientboundDisconnectPacket) {
+            flush()
+            return
+        }
+        var newPos: Vec3? = null
+        if (pk is ClientboundMoveEntityPacket) {
+            val level = mc.level ?: return
+            if (pk.getEntity(level) !== p) return
+            val codec = VecDeltaCodec()
+            latest?.let { codec.setBase(it) }
+            newPos = pk.positionDelta.decode(codec).endPosition()
+            lastMove = System.currentTimeMillis()
+        }
+        if (pk is ClientboundTeleportEntityPacket) {
+            if (p == null || pk.id() != p.id) return
+            newPos = pk.change().position()
+        }
+        if (pk is ClientboundEntityPositionSyncPacket) {
+            if (p == null || pk.id() != p.id) return
+            newPos = pk.position().endPosition()
+        }
+        if (newPos != null) {
+            previous = latest
+            latest = newPos
+            val self = mc.player
+            if (p != null && self != null && self.position().distanceToSqr(newPos) <= self.position().distanceToSqr(p.position())) {
+                release(true)
+                return
+            }
+        }
+        delayed += Delayed(pk, System.currentTimeMillis())
+        e.cancel()
+    }
+
+    private fun release(force: Boolean) {
+        val cutoff = System.currentTimeMillis() - aura.moveDelay.value
+        val it = delayed.iterator()
+        while (it.hasNext()) {
+            val d = it.next()
+            if (force || d.time <= cutoff) {
+                ready += d.packet
+                it.remove()
+            }
+        }
+    }
+
+    /** Once per frame, after the client ran its tasks. */
+    fun postTasks() {
+        if (mc.level == null || mc.player == null) {
+            delayed.clear()
+            player = null
+            latest = null
+            return
+        }
+        val p = player
+        if (p != null && p.isAlive) release(false) else flush()
+        while (true) handle(ready.poll() ?: break)
+    }
+
+    fun flush() {
+        while (true) handle(delayed.poll()?.packet ?: break)
+        player = null
+        latest = null
+    }
+
+    /** The original's `ht.c`: a pulsing ghost where the server has the target, once that is a block or more from where it shows. */
+    fun render() {
+        val p = player ?: return
+        val z = latest ?: return
+        val h = previous ?: return
+        if (p.position().distanceToSqr(z) - 1.0 < 0) return
+        var a = (System.currentTimeMillis() / 2.0 % 360).toInt()
+        if (a >= 180) a = 360 - a
+        val k = Mth.clamp((System.currentTimeMillis() - lastMove) / 100f, 0f, 1f).toDouble()
+        val pos = Vec3(Mth.lerp(k, h.x, z.x), Mth.lerp(k, h.y, z.y), Mth.lerp(k, h.z, z.z))
+        Ghost.draw(pos, p, a / 360f, true)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun handle(p: Packet<*>) {
+        val listener = mc.connection ?: return
+        try {
+            (p as Packet<ClientGamePacketListener>).handle(listener)
+        } catch (_: Exception) {
+        }
+    }
+}
+
+/**
+ * The original's `kk.D`: vanilla's crosshair pick, but looking along [yaw]/[pitch] and reaching [entityRange] for entities.
+ */
+fun pickAlong(blockRange: Double, entityRange: Double, yaw: Float, pitch: Float): HitResult? {
+    val p = mc.player ?: return null
+    val level = mc.level ?: return null
+    var maxR = max(blockRange, entityRange)
+    var maxSq = maxR * maxR
+    val eye = p.eyePosition
+    val dir = Vec3.directionFromRotation(pitch, yaw)
+    val blockHit = level.clip(ClipContext(eye, eye.add(dir.scale(blockRange)), ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, p))
+    val blockDistSq = blockHit.location.distanceToSqr(eye)
+    if (blockHit.type != HitResult.Type.MISS) {
+        maxSq = blockDistSq
+        maxR = sqrt(blockDistSq)
+    }
+    val end = eye.add(dir.scale(maxR))
+    val box = p.boundingBox.expandTowards(dir.scale(maxR)).inflate(1.0)
+    val eHit = ProjectileUtil.getEntityHitResult(p, eye, end, box, EntitySelector.CAN_BE_PICKED, maxSq)
+    fun filter(hit: HitResult, r: Double): HitResult =
+        if (hit.location.closerThan(eye, r)) hit
+        else BlockHitResult.miss(hit.location, Direction.getApproximateNearest(hit.location.subtract(eye)), BlockPos.containing(hit.location))
+    return if (eHit != null && eHit.location.distanceToSqr(eye) < blockDistSq) filter(eHit, entityRange) else filter(blockHit, blockRange)
+}
+
+/** For callers that want the entity a pick found. */
+fun HitResult?.pickedEntity() = (this as? EntityHitResult)?.entity
+
+/** The shield check Aura's shield breaker uses: the target is using an item with a shield in a hand. */
+fun Player.holdingShieldUp() = isUsingItem && (offhandItem.`is`(Items.SHIELD) || mainHandItem.`is`(Items.SHIELD))

@@ -1,0 +1,36 @@
+# Setup: python tools/testcfg.py setup elytra-autopilot 'bind={"key":14,"hold":false,"mouse":false}' target=COORDS 'coords=2000 2250' height=-20 clearance=20 -- base-finder
+# Check: Base Finder lines for the donkey, sheep, armor stand, villagers and pearl stasis; "Arrived"; "Test passed".
+# Elytra Autopilot arrives at COORDS 2000 2250 and circles; Base Finder reports entity clues and a pearl stasis.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback true
+cmd time set noon
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd kill @e[type=!player]
+cmd gamemode survival
+cmd clear @s
+cmd item replace entity @s armor.chest with minecraft:elytra
+cmd item replace entity @s hotbar.8 with minecraft:firework_rocket 64
+cmd summon donkey 2010.5 -60 2010.5 {ChestedHorse:1b,NoAI:1b}
+cmd summon sheep 2012.5 -60 2010.5 {CustomName:"Bob",NoAI:1b}
+cmd summon armor_stand 2014.5 -60 2010.5 {equipment:{head:{id:"minecraft:diamond_helmet",count:1}}}
+cmd setblock 2018 -60 2010 water
+cmd summon ender_pearl 2018.5 -59.6 2010.5 {NoGravity:1b,Motion:[0.0,0.0,0.0]}
+cmd summon villager 2040.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2041.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2042.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2043.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2044.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2045.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2046.5 -60 2040.5 {NoAI:1b}
+cmd summon villager 2047.5 -60 2040.5 {NoAI:1b}
+wait 20
+key K
+wait 500
+shot circling_goal
+cmd data get entity @s Pos
+cmd execute if entity @s[x=1930,dx=140,z=2180,dz=140]
+wait 5
+quit

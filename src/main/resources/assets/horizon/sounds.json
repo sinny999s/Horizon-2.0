@@ -1,0 +1,47 @@
+{
+  "enable": {
+    "sounds": [
+      "horizon:enable"
+    ]
+  },
+  "disable": {
+    "sounds": [
+      "horizon:disable"
+    ]
+  },
+  "settings-open": {
+    "sounds": [
+      "horizon:settings-open"
+    ]
+  },
+  "settings-close": {
+    "sounds": [
+      "horizon:settings-close"
+    ]
+  },
+  "no-settings": {
+    "sounds": [
+      "horizon:no-settings"
+    ]
+  },
+  "switch-left": {
+    "sounds": [
+      "horizon:switch-left"
+    ]
+  },
+  "switch-right": {
+    "sounds": [
+      "horizon:switch-right"
+    ]
+  },
+  "found-stash": {
+    "sounds": [
+      "horizon:found-stash"
+    ]
+  },
+  "lego-breaking": {
+    "sounds": [
+      "horizon:lego-breaking"
+    ]
+  }
+}

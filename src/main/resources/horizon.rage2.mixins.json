@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.rage2",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "TridentItemMixin",
+    "LivingEntityTravelMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

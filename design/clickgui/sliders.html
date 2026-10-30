@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slider Styles</title>
+<!--
+	Slider styles for the ClickGUI mockup (index.html), side by side in its settings panel, to pick one. Each works
+	like the game's: drag or click, the wheel steps (0.1 above a range of 1, else 0.01; ints by 1), and the default is
+	marked. The examples are Elytra Plus's settings with the dev config's values.
+-->
+<style>
+@font-face { font-family: 'SF'; src: url('../../src/main/resources/assets/horizon/fonts/sf_regular.ttf'); font-weight: 400; ascent-override: 95.21%; descent-override: 24.12%; line-gap-override: 0%; }
+@font-face { font-family: 'SF'; src: url('../../src/main/resources/assets/horizon/fonts/sf_medium.ttf'); font-weight: 500; ascent-override: 95.21%; descent-override: 24.12%; line-gap-override: 0%; }
+@font-face { font-family: 'SF'; src: url('../../src/main/resources/assets/horizon/fonts/sf_semibold.ttf'); font-weight: 600; ascent-override: 95.21%; descent-override: 24.12%; line-gap-override: 0%; }
+@font-face { font-family: 'SF'; src: url('../../src/main/resources/assets/horizon/fonts/sf_bold.ttf'); font-weight: 700; ascent-override: 95.21%; descent-override: 24.12%; line-gap-override: 0%; }
+:root {
+	--a1: #f43838;
+	--a2: #ff6b5e;
+	--t1: #f5f5f7;
+	--t2: rgba(235, 235, 245, .64);
+	--t3: rgba(235, 235, 245, .38);
+	--line: rgba(255, 255, 255, .07);
+	--glow: color-mix(in oklab, var(--a1) 60%, transparent);
+	--expo: cubic-bezier(.16, 1, .3, 1);
+	--spring: cubic-bezier(.34, 1.56, .64, 1);
+	color-scheme: dark;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; font: 400 13px 'SF', system-ui, sans-serif; color: var(--t1); user-select: none; -webkit-font-smoothing: antialiased;
+	background: #0b0a0f url(backdrop-sunset.jpg) center / cover fixed; }
+body::before { content: ''; position: fixed; inset: 0; backdrop-filter: blur(18px) brightness(.5) saturate(1.2); }
+main { position: relative; max-width: 1180px; margin: 0 auto; padding: 28px 16px 40px; }
+h1 { font: 700 22px 'SF'; letter-spacing: -.3px; }
+.lead { color: var(--t2); margin: 6px 0 22px; font-size: 13.5px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; }
+.panel { border-radius: 18px; padding: 16px 10px 12px; background: linear-gradient(180deg, rgba(24, 21, 30, .82), rgba(11, 10, 15, .86));
+	border: 1px solid rgba(255, 255, 255, .09); backdrop-filter: blur(24px); box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .8); }
+.panel.ref { opacity: .8; }
+.ph { display: flex; align-items: center; gap: 10px; padding: 0 10px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
+.ph .n { width: 24px; height: 24px; border-radius: 8px; display: grid; place-items: center; font: 700 13px 'SF'; color: #fff; background: linear-gradient(135deg, var(--a1), var(--a2)); box-shadow: 0 4px 14px -4px var(--glow); }
+.ref .ph .n { background: rgba(255, 255, 255, .12); box-shadow: none; }
+.ph b { font: 600 14px 'SF'; }
+.ph small { margin-left: auto; color: var(--t3); font: 500 11.5px 'SF'; }
+.row { padding: 9px 12px; border-radius: 10px; transition: background .2s; }
+.row:hover { background: rgba(255, 255, 255, .03); }
+.line { display: flex; align-items: center; gap: 8px; height: 20px; }
+.lbl { font: 500 13px 'SF'; color: rgba(245, 245, 247, .88); }
+.val { margin-left: auto; font: 600 12.5px 'SF'; font-variant-numeric: tabular-nums; color: var(--t1); }
+.chipv { margin-left: auto; height: 22px; padding: 0 8px; border-radius: 7px; background: rgba(255, 255, 255, .07); display: inline-flex; align-items: center; font: 600 12px 'SF'; font-variant-numeric: tabular-nums; }
+.ctl { position: relative; touch-action: none; cursor: pointer; }
+.tip { position: absolute; bottom: calc(100% + 8px); transform: translateX(-50%) translateY(4px) scale(.9); opacity: 0; pointer-events: none;
+	padding: 4px 8px; border-radius: 7px; background: #fff; color: #111; font: 700 11.5px 'SF'; font-variant-numeric: tabular-nums; white-space: nowrap;
+	transition: opacity .2s, transform .3s var(--spring); }
+.tip::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -4px; border: 4px solid transparent; border-top-color: #fff; }
+.ctl:hover .tip, .ctl.drag .tip { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+.anim * { transition-property: left, width, right, transform, background, opacity, box-shadow !important; transition-duration: .35s !important; transition-timing-function: var(--expo) !important; }
+.sw { width: 34px; height: 20px; border-radius: 10px; margin-left: auto; position: relative; background: linear-gradient(90deg, var(--a1), var(--a2)); box-shadow: 0 0 14px -3px var(--glow); }
+.sw::after { content: ''; position: absolute; top: 2px; left: 16px; width: 16px; height: 16px; border-radius: 8px; background: #fff; }
+
+/* 1 split: the track splits around a slim handle (Material 3's newer slider) */
+.s1 { height: 26px; margin-top: 8px; }
+.s1 .act, .s1 .ina { position: absolute; top: 6px; height: 14px; }
+.s1 .act { left: 0; border-radius: 7px 3px 3px 7px; background: linear-gradient(90deg, var(--a1), var(--a2)); box-shadow: 0 0 14px -4px var(--glow); }
+.s1 .ina { right: 0; border-radius: 3px 7px 7px 3px; background: rgba(255, 255, 255, .09); }
+.s1 .ina::after { content: ''; position: absolute; right: 5px; top: 5px; width: 4px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+.s1 .hd { position: absolute; top: 0; width: 4px; height: 26px; margin-left: -2px; border-radius: 2px; background: #fff; transition: width .2s var(--expo), margin .2s var(--expo); }
+.s1.drag .hd { width: 2px; margin-left: -1px; }
+.s1 .df { position: absolute; top: 11px; width: 4px; height: 4px; margin-left: -2px; border-radius: 2px; background: rgba(255, 255, 255, .45); mix-blend-mode: overlay; }
+
+/* 2 knob: a soft track with a big white knob */
+.s2 { height: 22px; margin-top: 6px; }
+.s2 .tr { position: absolute; left: 0; right: 0; top: 8px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .1); }
+.s2 .fi { position: absolute; left: 0; top: 8px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--a1), var(--a2)); box-shadow: 0 0 12px -2px var(--glow); }
+.s2 .df { position: absolute; top: 9px; width: 4px; height: 4px; margin-left: -2px; border-radius: 2px; background: rgba(255, 255, 255, .5); }
+.s2 .kn { position: absolute; top: 1px; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%;
+	background: linear-gradient(180deg, #fff, #e9e9ee); box-shadow: 0 2px 8px rgba(0, 0, 0, .45), 0 0 0 .5px rgba(0, 0, 0, .25); transition: transform .3s var(--spring), box-shadow .3s; }
+.s2:hover .kn { transform: scale(1.08); }
+.s2.drag .kn { transform: scale(1.14); box-shadow: 0 4px 14px rgba(0, 0, 0, .5), 0 0 0 4px color-mix(in oklab, var(--a1) 25%, transparent); }
+
+/* 3 glow line: a hairline with a neon fill and a diamond, ticks underneath */
+.s3 { height: 24px; margin-top: 6px; }
+.s3 .tr { position: absolute; left: 0; right: 0; top: 9px; height: 2px; background: rgba(255, 255, 255, .12); }
+.s3 .fi { position: absolute; left: 0; top: 9px; height: 2px; background: linear-gradient(90deg, transparent, var(--a1) 30%, var(--a2)); box-shadow: 0 0 8px var(--a1), 0 0 18px var(--glow); }
+.s3 .kn { position: absolute; top: 5px; width: 10px; height: 10px; margin-left: -5px; transform: rotate(45deg); background: #fff; box-shadow: 0 0 0 2px var(--a1), 0 0 14px var(--a1); transition: transform .3s var(--spring); }
+.s3:hover .kn, .s3.drag .kn { transform: rotate(45deg) scale(1.25); }
+.s3 .tk { position: absolute; top: 17px; width: 1px; height: 4px; background: rgba(255, 255, 255, .2); }
+.s3 .df { position: absolute; top: 15px; width: 0; height: 0; margin-left: -3px; border: 3px solid transparent; border-bottom-color: rgba(255, 255, 255, .55); }
+.s3v { color: color-mix(in oklab, var(--a1) 60%, white); }
+
+/* 4 segments: a meter of cells that light up */
+.s4 { height: 18px; margin-top: 8px; display: flex; gap: 3px; align-items: center; }
+.s4 i { flex: 1; height: 12px; border-radius: 3px; background: rgba(255, 255, 255, .08); transition: background .2s, transform .25s var(--spring), box-shadow .2s, height .2s var(--expo); }
+.s4 i.on { background: color-mix(in oklab, var(--a1) calc(var(--p) * 100%), var(--a2)); }
+.s4 i.last { height: 18px; box-shadow: 0 0 12px var(--glow); background: #fff; }
+.s4 i.def { box-shadow: inset 0 -2px 0 rgba(255, 255, 255, .45); }
+.s4 i.hov:not(.on) { background: rgba(255, 255, 255, .16); }
+
+/* 5 the current bar, for comparison */
+.bar { position: relative; height: 32px; border-radius: 9px; overflow: hidden; display: flex; align-items: center; padding: 0 11px; touch-action: none; cursor: ew-resize;
+	background: rgba(255, 255, 255, .035); border: 1px solid var(--line); }
+.bar .fi { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, color-mix(in oklab, var(--a1) 10%, transparent), color-mix(in oklab, var(--a1) 30%, transparent)); }
+.bar .ed { position: absolute; top: 0; bottom: 0; width: 2px; opacity: .75; background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--a1) 70%, white) 30%, color-mix(in oklab, var(--a1) 70%, white) 70%, transparent); }
+.bar span { position: relative; }
+.bar .val { position: relative; }
+.row.barrow { padding: 4px 10px; }
+</style>
+</head>
+<body>
+<main>
+	<h1>Slider styles</h1>
+	<p class="lead">Drag them, scroll on them, hover them. Each panel is the settings panel with Elytra Plus's real settings. Pick a number.</p>
+	<div class="grid" id="grid"></div>
+</main>
+<script>
+(() => {
+'use strict';
+const SETTINGS = [
+	{ name: 'X Z Speed', type: 'float', min: 0.1, max: 10, def: 1.55, value: 1.55 },
+	{ name: 'Height', type: 'int', min: 1, max: 256, def: 121, value: 121 },
+	{ name: 'Y Speed', type: 'float', min: 0, max: 2, def: 0.47, value: 0.47 },
+	{ name: 'Firework Delay', type: 'int', min: 0, max: 40, def: 8, value: 8 },
+];
+const STYLES = [
+	{ n: '1', name: 'Split', note: 'track splits around a handle' },
+	{ n: '2', name: 'Knob', note: 'soft track, big knob' },
+	{ n: '3', name: 'Glow line', note: 'neon hairline, diamond' },
+	{ n: '4', name: 'Segments', note: 'a meter of cells' },
+	{ n: '–', name: 'Current', note: 'the bar you have now', ref: true },
+];
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+const fmt = s => s.type === 'int' ? String(s.value) : (Number.isInteger(s.value) ? s.value.toFixed(1) : String(+s.value.toFixed(2)));
+const norm = (s, v) => Math.max(0, Math.min(1, (v - s.min) / (s.max - s.min)));
+const round = (s, v) => { const k = s.type === 'int' ? 1 : s.max > 1 ? 10 : 100; return Math.round(v * k) / k; };
+
+function drag(el, s, sync) {
+	const at = e => { const r = el.getBoundingClientRect(); return s.min + (s.max - s.min) * Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); };
+	const anim = () => { el.classList.add('anim'); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('anim'), 380); };
+	el.addEventListener('pointerdown', e => {
+		el.setPointerCapture(e.pointerId);
+		el.classList.add('drag');
+		anim();
+		s.value = round(s, at(e));
+		sync();
+		const mv = ev => { el.classList.remove('anim'); s.value = round(s, at(ev)); sync(); };
+		el.addEventListener('pointermove', mv);
+		el.addEventListener('pointerup', () => { el.classList.remove('drag'); el.removeEventListener('pointermove', mv); }, { once: true });
+	});
+	el.addEventListener('wheel', e => {
+		e.preventDefault();
+		anim();
+		const step = s.type === 'int' ? 1 : s.max > 1 ? .1 : .01;
+		s.value = round(s, Math.max(s.min, Math.min(s.max, s.value + (e.deltaY < 0 ? step : -step))));
+		sync();
+	}, { passive: false });
+}
+
+function build(style, base) {
+	const s = { ...base };
+	switch (style.n) {
+		case '1': {
+			const act = h('i', 'act'), ina = h('i', 'ina'), hd = h('i', 'hd'), df = h('i', 'df'), tip = h('div', 'tip');
+			const ctl = h('div', 'ctl s1', act, ina, df, hd, tip);
+			const val = h('span', 'val');
+			const sync = () => {
+				const t = norm(s, s.value) * 100;
+				act.style.width = `calc(${t}% - 6px)`;
+				act.style.display = t < 2 ? 'none' : '';
+				ina.style.left = `calc(${t}% + 6px)`;
+				ina.style.display = t > 98 ? 'none' : '';
+				hd.style.left = t + '%';
+				tip.style.left = t + '%';
+				tip.textContent = val.textContent = fmt(s);
+			};
+			df.style.left = norm(s, s.def) * 100 + '%';
+			drag(ctl, s, sync);
+			sync();
+			return h('div', 'row', h('div', 'line', h('span', 'lbl', s.name), val), ctl);
+		}
+		case '2': {
+			const fi = h('i', 'fi'), kn = h('i', 'kn'), df = h('i', 'df');
+			const ctl = h('div', 'ctl s2', h('i', 'tr'), fi, df, kn);
+			const val = h('span', 'chipv');
+			const sync = () => { const t = norm(s, s.value) * 100; fi.style.width = t + '%'; kn.style.left = `calc(10px + (100% - 20px) * ${t / 100})`; val.textContent = fmt(s); };
+			df.style.left = `calc(10px + (100% - 20px) * ${norm(s, s.def)})`;
+			drag(ctl, s, sync);
+			sync();
+			return h('div', 'row', h('div', 'line', h('span', 'lbl', s.name), val), ctl);
+		}
+		case '3': {
+			const fi = h('i', 'fi'), kn = h('i', 'kn'), df = h('i', 'df'), tip = h('div', 'tip');
+			const ticks = [0, 25, 50, 75, 100].map(p => { const t = h('i', 'tk'); t.style.left = p + '%'; return t; });
+			const ctl = h('div', 'ctl s3', h('i', 'tr'), ...ticks, fi, df, kn, tip);
+			const val = h('span', 'val s3v');
+			const sync = () => { const t = norm(s, s.value) * 100; fi.style.width = t + '%'; kn.style.left = t + '%'; tip.style.left = t + '%'; tip.textContent = val.textContent = fmt(s); };
+			df.style.left = norm(s, s.def) * 100 + '%';
+			drag(ctl, s, sync);
+			sync();
+			return h('div', 'row', h('div', 'line', h('span', 'lbl', s.name), val), ctl);
+		}
+		case '4': {
+			const N = 24;
+			const cells = Array.from({ length: N }, () => h('i'));
+			const ctl = h('div', 'ctl s4', ...cells);
+			const val = h('span', 'chipv');
+			const di = Math.min(N - 1, Math.floor(norm(s, s.def) * N));
+			cells[di].classList.add('def');
+			const sync = () => {
+				const lit = Math.round(norm(s, s.value) * N);
+				cells.forEach((c, i) => {
+					c.classList.toggle('on', i < lit);
+					c.classList.toggle('last', i === lit - 1);
+					c.style.setProperty('--p', 1 - i / N);
+				});
+				val.textContent = fmt(s);
+			};
+			ctl.addEventListener('pointermove', e => {
+				const r = ctl.getBoundingClientRect(), hv = Math.ceil((e.clientX - r.left) / r.width * N);
+				cells.forEach((c, i) => c.classList.toggle('hov', i < hv));
+			});
+			ctl.addEventListener('pointerleave', () => cells.forEach(c => c.classList.remove('hov')));
+			drag(ctl, s, sync);
+			sync();
+			return h('div', 'row', h('div', 'line', h('span', 'lbl', s.name), val), ctl);
+		}
+		default: {
+			const fi = h('i', 'fi'), ed = h('i', 'ed'), val = h('span', 'val');
+			const ctl = h('div', 'bar', fi, ed, h('span', 'lbl', s.name), val);
+			const sync = () => { const t = norm(s, s.value) * 100; fi.style.width = t + '%'; ed.style.left = `calc(${t}% - ${t * .02}px)`; val.textContent = fmt(s); };
+			drag(ctl, s, sync);
+			sync();
+			return h('div', 'row barrow', ctl);
+		}
+	}
+}
+
+const grid = document.getElementById('grid');
+for (const st of STYLES) {
+	const p = h('section', 'panel' + (st.ref ? ' ref' : ''), h('div', 'ph', h('span', 'n', st.n), h('b', null, st.name), h('small', null, st.note)));
+	for (const s of SETTINGS) p.append(build(st, s));
+	p.append(h('div', 'row', h('div', 'line', h('span', 'lbl', 'Anti Kick'), h('span', 'sw'))));
+	grid.append(p);
+}
+})();
+</script>
+</body>
+</html>

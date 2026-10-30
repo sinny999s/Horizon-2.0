@@ -1,0 +1,32 @@
+# The new ClickGUI's soft glows: the shadow around the window, the selected card's shadow and the accent under an enabled
+# card, the inspector's accent light on an enabled module, the ambient light, and the light following the mouse over a
+# card (hover-*: in a card's middle, and by its corner, where it must stop at the rounded edge). None should show rings or
+# steps: look at them with the contrast turned up.
+# Setup:  python tools/testcfg.py setup UI 'bind={"key":12,"hold":false,"mouse":false}' style=NEW
+# Run:    sh tools/run-test.sh tools/examples/clickgui-glow.txt
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 60
+key I
+wait 45
+# Anti Phase: on and selected, so its card and the inspector both glow
+click 500 290 L
+wait 10
+click 500 290 R
+wait 60
+move 1100 840
+wait 20
+shot glow
+move 860 290
+wait 30
+shot hover-middle
+move 725 245
+wait 30
+shot hover-corner
+quit

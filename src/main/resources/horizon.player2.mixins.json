@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.player2",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "EntityBoxMixin",
+    "KeyInputMixin",
+    "MouseInputMixin",
+    "MovePlayerMixin",
+    "ItemStackFinishMixin",
+    "UseItemOnMixin",
+    "StartAttackMixin",
+    "UseDelayAccessor",
+    "JumpDelayAccessor",
+    "JumpRidingAccessor",
+    "PlayerPositionPacketAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

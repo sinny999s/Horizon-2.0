@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.pvp",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "PvpLocalPlayerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

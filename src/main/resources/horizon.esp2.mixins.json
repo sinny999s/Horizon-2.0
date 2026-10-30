@@ -1,0 +1,22 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.esp2",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "BlockBehaviourMixin",
+    "BlockMixin",
+    "CameraMixin",
+    "ClientLevelRemoveMixin",
+    "LevelChunkMixin",
+    "LightmapMixin",
+    "LocalPlayerMoveMixin",
+    "SodiumBlockRendererMixin",
+    "SodiumRenderContextMixin",
+    "SodiumVisGraphMixin",
+    "VisGraphMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,36 @@
+# Gradle & Build Artifacts
+.gradle/
+build/
+out/
+.kotlin/
+
+# Runtime Game Directory (worlds, server logs, accounts, private configs)
+run/
+
+# Test harness build caches & test outputs
+tools/shotbot/.gradle/
+tools/shotbot/build/
+tools/test-out/
+
+# IDE & Editor files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# AI assistant & scratch metadata
+AGENTS.md
+CLAUDE.md
+.claude/
+.gemini/
+*.tmp
+*.log
+
+# Operating System metadata
+Thumbs.db
+Desktop.ini
+.DS_Store

@@ -1,0 +1,61 @@
+# Setup: python tools/testcfg.py setup elytra-autopilot 'bind={"key":14,"hold":false,"mouse":false}' target=TRAIL height=-20 clearance=20 circle-time=30 -- new-chunks
+# Check: "Following a trail ... heading 25 degrees", positions drifting to -X along the band, then "The trail ends near".
+# Elytra Autopilot TRAIL: a 3-chunk-wide band of saved (old) chunks at 30 degrees from Z 2040; it should follow it.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback false
+cmd time set noon
+wait 40
+cmd forceload add 1984 2024 2016 2056
+cmd forceload add 1972 2044 2004 2076
+cmd forceload add 1960 2065 1992 2097
+cmd forceload add 1948 2086 1980 2118
+cmd forceload add 1936 2107 1968 2139
+cmd forceload add 1924 2127 1956 2159
+cmd forceload add 1912 2148 1944 2180
+cmd forceload add 1900 2169 1932 2201
+cmd forceload add 1888 2190 1920 2222
+cmd forceload add 1876 2211 1908 2243
+cmd forceload add 1864 2231 1896 2263
+cmd forceload add 1852 2252 1884 2284
+cmd forceload add 1840 2273 1872 2305
+cmd forceload add 1828 2294 1860 2326
+cmd forceload add 1816 2314 1848 2346
+cmd forceload add 1804 2335 1836 2367
+cmd forceload add 1792 2356 1824 2388
+cmd forceload add 1780 2377 1812 2409
+cmd forceload add 1768 2398 1800 2430
+cmd forceload add 1756 2418 1788 2450
+cmd forceload add 1744 2439 1776 2471
+cmd forceload add 1732 2460 1764 2492
+cmd forceload add 1720 2481 1752 2513
+cmd forceload add 1708 2502 1740 2534
+cmd forceload add 1696 2522 1728 2554
+cmd forceload add 1684 2543 1716 2575
+cmd forceload add 1672 2564 1704 2596
+wait 100
+cmd forceload remove all
+wait 300
+cmd save-all
+wait 100
+cmd gamerule send_command_feedback true
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 80
+cmd kill @e[type=!player]
+cmd gamemode survival
+cmd clear @s
+cmd item replace entity @s armor.chest with minecraft:elytra
+cmd item replace entity @s hotbar.8 with minecraft:firework_rocket 64
+wait 20
+key K
+wait 300
+shot trail
+cmd data get entity @s Pos
+wait 200
+cmd data get entity @s Pos
+wait 300
+shot trail_end
+cmd data get entity @s Pos
+wait 5
+quit

@@ -1,0 +1,49 @@
+# ShotBot test for no-render:
+#   1. Blindness, Darkness, Nausea, Fire Overlay, Potion HUD, Bossbar, Scoreboard, Sign Text, End Crystal, Armor Stand, Fog
+#   2. Underwater Overlay and In-Wall Block Overlay
+
+title 40
+world
+wait 40
+
+cmd gamerule spawn_mobs false
+cmd kill @e[type=!player]
+cmd time set noon
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+
+# Apply Blindness, Darkness, Nausea, and Fire Resistance, and set fire at feet
+cmd effect give @s minecraft:blindness 120 0
+cmd effect give @s minecraft:darkness 120 0
+cmd effect give @s minecraft:nausea 120 0
+cmd effect give @s minecraft:fire_resistance 120 0
+cmd setblock 2000 -60 2000 minecraft:fire
+
+# Add bossbar and scoreboard sidebar (both should be hidden)
+cmd bossbar add test:boss "Test Boss"
+cmd bossbar set test:boss players @s
+cmd scoreboard objectives add testsb dummy "Test Scoreboard"
+cmd scoreboard objectives setdisplay sidebar testsb
+cmd scoreboard players set @s testsb 42
+
+# Place a written sign, an end crystal, and an armor stand in front of the player (z = 2004)
+cmd setblock 2000 -60 2004 minecraft:oak_sign[rotation=8]{front_text:{messages:["\"LINE 1\"","\"LINE 2\"","\"\"","\"\""]}}
+cmd summon minecraft:end_crystal 2001.5 -60 2004.5
+cmd summon minecraft:armor_stand 1999.5 -60 2004.5 {CustomName:"\"HiddenStand\"",CustomNameVisible:1b}
+
+wait 30
+shot 1_effects_fire_entities_hud
+
+# Test underwater overlay (submerged in water)
+cmd fill 2010 -60 2000 2012 -58 2002 minecraft:water
+cmd tp @s 2011.5 -60 2001.5 0 0
+wait 20
+shot 2_underwater_overlay
+
+# Test in-wall block suffocation overlay (eye inside stone)
+cmd fill 2020 -60 2000 2020 -59 2000 minecraft:stone
+cmd tp @s 2020.5 -60 2000.5 0 0
+wait 20
+shot 3_block_overlay
+
+quit

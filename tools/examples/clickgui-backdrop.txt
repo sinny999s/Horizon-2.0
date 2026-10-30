@@ -1,0 +1,49 @@
+# Clean scenery on the 2b2t/6b6t seed (HUD hidden with F1) for the ClickGUI mockup's backdrop: the cherry grove at
+# 426 -1287 (found with clickgui-locate.txt), the camera placed a few blocks over the surface.
+title 40
+world normal -4172144997902289642
+wait 60
+cmd gamemode spectator
+cmd gamerule advance_time false
+cmd time set 1500
+cmd tp @s 426 150 -1287
+wait 300
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 0 6
+wait 400
+key F1
+wait 10
+shot a_day_0
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 90 6
+wait 120
+shot a_day_90
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 180 6
+wait 120
+shot a_day_180
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 270 6
+wait 120
+shot a_day_270
+cmd time set 12300
+wait 30
+shot a_gold_270
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 180 6
+wait 30
+shot a_gold_180
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 90 6
+wait 30
+shot a_gold_90
+cmd execute positioned 426 0 -1287 positioned over motion_blocking run tp @s ~ ~10 ~ 0 6
+wait 30
+shot a_gold_0
+cmd execute positioned 380 0 -1287 positioned over motion_blocking run tp @s ~ ~4 ~ 270 2
+wait 80
+shot b_gold_270
+cmd time set 1500
+wait 30
+shot b_day_270
+cmd execute positioned 426 0 -1240 positioned over motion_blocking run tp @s ~ ~4 ~ 180 2
+wait 80
+shot c_day_180
+cmd time set 12300
+wait 30
+shot c_gold_180
+quit

@@ -1,0 +1,67 @@
+# ShotBot test for AutoDripstope, AttributeSwap, MaceKiller, MiddleClick pearl trajectory preview, and StaffDetector
+title 40
+world
+wait 50
+
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback true
+cmd time set noon
+cmd weather clear
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd kill @e[type=!player]
+
+# 1. Give items: sword in slot 0, mace in slot 1, pointed_dripstone in slot 2, ender_pearl in slot 3, fireworks in slot 4
+cmd item replace entity @s hotbar.0 with minecraft:wooden_sword
+cmd item replace entity @s hotbar.1 with minecraft:mace
+cmd item replace entity @s hotbar.2 with minecraft:pointed_dripstone 16
+cmd item replace entity @s hotbar.3 with minecraft:ender_pearl 16
+cmd item replace entity @s hotbar.4 with minecraft:firework_rocket 64
+cmd item replace entity @s armor.chest with minecraft:elytra
+wait 10
+
+# 2. Spawn fake player under trapdoor position (2000, -60, 2002) and add to a staff team ("admin ")
+fakeplayer ModerBot 2000.5 -60 2002.5 180
+wait 10
+cmd team add staffteam
+cmd team modify staffteam prefix "Admin "
+cmd team join staffteam ModerBot
+wait 15
+
+# 3. Test MiddleClick pearl trajectory preview (holding pick-block key draws pearl trajectory in 3D without holding pearl in hand)
+cmd tp @s 2000.5 -60 2000.5 180 -15
+wait 10
+keydown NUMPAD1
+wait 10
+shot 1_middle_click_pearl_preview
+keyup NUMPAD1
+wait 15
+
+# 4. Test AutoDripstope:
+#    - Trapdoor A at 2000 -57 2002 (above ModerBot at 2000.5 -60 2002.5) -> places pointed_dripstone & fast-opens trapdoor
+#    - Trapdoor B at 2003 -57 2002 (no entity underneath) -> does NOT place pointed_dripstone or open trapdoor
+cmd tp @s 2000.5 -60 2000.5 0 -30
+wait 10
+cmd setblock 2000 -57 2003 minecraft:stone
+cmd setblock 2000 -58 2003 minecraft:stone
+cmd setblock 2000 -57 2002 minecraft:oak_trapdoor[half=bottom,open=false,facing=north]
+cmd setblock 2003 -57 2003 minecraft:stone
+cmd setblock 2003 -58 2003 minecraft:stone
+cmd setblock 2003 -57 2002 minecraft:oak_trapdoor[half=bottom,open=false,facing=north]
+wait 25
+
+# Verify Trapdoor A had pointed_dripstone placed under it by AutoDripstope and Trapdoor B (no entity under it) was untouched
+# (No check for dripstone under Trapdoor A: Auto Dripstope flips the trapdoor right after placing, so the dripstone
+# falls and is gone. tools/examples/auto-dripstope.txt checks it properly, in survival, by the dripstone used up.)
+cmd execute if block 2003 -57 2002 minecraft:oak_trapdoor[open=false]
+cmd execute unless block 2003 -58 2002 minecraft:pointed_dripstone
+shot 2_auto_dripstope_and_staff
+
+# 5. Test AttributeSwap + MaceKiller attack on ModerBot
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 10
+hold keyAttack 5
+wait 15
+shot 3_attribute_swap_mace_killer
+
+quit

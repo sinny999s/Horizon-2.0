@@ -1,0 +1,23 @@
+# Setup: python tools/testcfg.py setup custom-hotbar modern-food=false -- offhand force-item=OFF bind-swap=true swap=CUSTOM
+# Check: survival.png shows the shield in the offhand dock and vanilla food; creative.png shows the hotbar only.
+# Custom Hotbar + Offhand custom swap: the offhand dock must still show the shield; modern food off -> vanilla food shows.
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd time set noon
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd kill @e[type=!player]
+cmd gamemode survival
+cmd item replace entity @s hotbar.0 with minecraft:netherite_sword
+cmd item replace entity @s hotbar.2 with minecraft:totem_of_undying
+cmd item replace entity @s weapon.offhand with minecraft:shield
+cmd item replace entity @s armor.chest with minecraft:diamond_chestplate
+cmd experience add @s 12 levels
+wait 40
+shot survival
+cmd gamemode creative
+wait 20
+shot creative
+wait 5
+quit

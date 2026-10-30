@@ -1,0 +1,33 @@
+# Control for speed-mine-multi: plain vanilla mining of one obsidian with the same pickaxe (run with Speed Mine off): how
+# long should it take? Efficiency III netherite: 79 ticks.
+# Setup:  python tools/testcfg.py setup shulker-view
+# Run:    sh tools/run-test.sh tools/examples/speed-mine-control.txt
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5
+wait 60
+cmd gamemode survival
+cmd clear @s
+cmd give @s netherite_pickaxe[enchantments={efficiency:3}]
+cmd setblock 2001 -61 2000 obsidian
+wait 5
+cmd attribute @s minecraft:block_break_speed get
+cmd attribute @s minecraft:mining_efficiency get
+cmd data get entity @s SelectedItem
+cmd tp @s 2000.5 -60 2000.5 facing 2001.5 -61.62 2000.5
+wait 3
+packets speed-mine-control-packets.txt
+hold keyAttack 110
+wait 20
+cmd execute if block 2001 -61 2000 air
+wait 20
+cmd execute if block 2001 -61 2000 air
+wait 30
+cmd execute if block 2001 -61 2000 air
+wait 40
+cmd execute if block 2001 -61 2000 air
+wait 10
+quit

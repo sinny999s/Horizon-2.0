@@ -1,0 +1,89 @@
+# Portal Pattern Finder: broken-portal shapes in cave air, and shapes that must not count. Expect a chat line after each
+# of P1 (x-plane 2x3), P2 (z-plane 2x3), P3 (frame-sized 4x5 without corners), P4 (across a chunk border), P5 (inside a
+# kept obsidian frame) and P6 broken (a lit portal, once broken, not while lit). None after N1 (one wide), N2 (two
+# thick), N3 (no cave air) or N4 (too wide). Empty frames out in the open, no cave air: a line after F1 (x), F2 (z); none
+# after F3 (a block missing), F4 (one wide) or F5 (a frame with a stone block in it).
+# Setup:  python tools/testcfg.py setup portal-pattern-finder notify=true
+# Run:    sh tools/run-test.sh tools/examples/portal-pattern-finder.txt
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd gamemode spectator
+cmd tp @s 2016.5 -44 2016.5
+wait 80
+cmd fill 2000 -58 2000 2031 -38 2031 stone
+wait 5
+cmd fill 2001 -57 2001 2030 -39 2030 cave_air
+wait 10
+cmd say P1 x-plane
+cmd fill 2005 -50 2005 2006 -48 2005 air
+wait 10
+cmd say P2 z-plane
+cmd fill 2010 -50 2005 2010 -48 2006 air
+wait 10
+cmd say P3 frame-sized
+cmd fill 2005 -50 2012 2008 -46 2012 air
+cmd setblock 2005 -50 2012 cave_air
+cmd setblock 2008 -50 2012 cave_air
+cmd setblock 2005 -46 2012 cave_air
+cmd setblock 2008 -46 2012 cave_air
+wait 10
+cmd say P4 chunk border
+cmd fill 2015 -50 2020 2016 -48 2020 air
+wait 10
+cmd say P5 kept frame
+cmd fill 2024 -50 2025 2027 -46 2025 obsidian
+cmd fill 2025 -49 2025 2026 -47 2025 air
+wait 10
+cmd say N1 one wide
+cmd fill 2020 -50 2005 2020 -48 2005 air
+wait 10
+cmd say N2 two thick
+cmd fill 2020 -50 2010 2021 -48 2011 air
+wait 10
+cmd say N3 no cave air
+cmd fill 2040 -58 2040 2046 -50 2046 stone
+cmd fill 2042 -56 2043 2043 -54 2043 air
+wait 10
+cmd say N4 too wide
+cmd fill 2005 -44 2020 2013 -40 2020 air
+wait 10
+cmd say P6 lit portal
+cmd fill 2024 -50 2005 2027 -46 2005 obsidian
+cmd fill 2025 -49 2005 2026 -47 2005 nether_portal[axis=x]
+wait 20
+shot lit
+cmd say P6 broken
+cmd fill 2025 -49 2005 2026 -47 2005 air
+wait 15
+cmd say F1 frame x
+cmd fill 1990 -60 2040 1993 -56 2040 obsidian
+cmd fill 1991 -59 2040 1992 -57 2040 air
+wait 10
+cmd say F2 frame z
+cmd fill 1996 -60 2040 1996 -56 2043 obsidian
+cmd fill 1996 -59 2041 1996 -57 2042 air
+wait 10
+cmd say F3 block missing
+cmd fill 1990 -60 2050 1993 -56 2050 obsidian
+cmd fill 1991 -59 2050 1992 -57 2050 air
+cmd setblock 1991 -56 2050 air
+wait 10
+cmd say F4 one wide
+cmd fill 1990 -60 2056 1992 -56 2056 obsidian
+cmd fill 1991 -59 2056 1991 -57 2056 air
+wait 10
+cmd say F5 stone inside
+cmd fill 1990 -60 2062 1993 -56 2062 obsidian
+cmd fill 1991 -59 2062 1992 -57 2062 air
+cmd setblock 1991 -58 2062 stone
+wait 10
+cmd tp @s 2016.5 -42 2000.5 facing 2016.5 -49 2016.5
+wait 10
+shot found
+wait 5
+quit

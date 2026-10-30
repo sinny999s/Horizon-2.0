@@ -1,0 +1,44 @@
+# The new ClickGUI, part 2: slider drag, X-Ray's block list, the HUD button, and Theme > Style > Classic.
+# Setup as modern-gui.txt. Run: sh tools/run-test.sh tools/examples/modern-gui-2.txt
+title 40
+world
+cmd gamerule spawn_mobs false
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60 2000.5 -20 5
+wait 60
+key I
+wait 30
+# Auto Crystal > Place > Place Delay: drag the handle
+click 1110 389
+wait 15
+down 1093 501
+move 1180 501
+wait 2
+move 1250 501
+wait 5
+shot slider-drag
+up 1250 501
+wait 10
+shot slider-after
+# X-Ray's blocks
+type x ray
+wait 10
+key RETURN
+wait 20
+shot xray
+# HUD opens Horizon's HUD editor
+click 1285 129
+wait 20
+shot hud
+key ESCAPE
+wait 15
+key I
+wait 30
+shot reopened
+# Theme > Style > Classic
+click 1365 129
+wait 15
+click 1323 330
+wait 25
+shot theme-classic
+quit

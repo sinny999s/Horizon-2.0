@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.player1",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "FishingHookAccessor",
+    "ServerboundMovePlayerPacketAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

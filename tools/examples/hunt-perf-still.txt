@@ -1,0 +1,71 @@
+# FPS of the owner's hunting setup standing still over real terrain at their render distance: every module on, then each
+# turned off in turn. tools/test-out/hunt-perf-still/perf.txt has FPS and a profile per window. See hunt-perf.py.
+title 40
+world normal -4172144997902289642
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd gamemode spectator
+cmd tp @s 5000 140 5000 0 15
+wait 2600
+shot loaded
+perf all on
+wait 200
+perfoff
+toggle base-finder off
+wait 40
+perf without base-finder and those above
+wait 200
+perfoff
+toggle hunt-map off
+wait 40
+perf without hunt-map and those above
+wait 200
+perfoff
+toggle portal-esp off
+wait 40
+perf without portal-esp and those above
+wait 200
+perfoff
+toggle storage-esp off
+wait 40
+perf without storage-esp and those above
+wait 200
+perfoff
+toggle glow-esp off
+wait 40
+perf without glow-esp and those above
+wait 200
+perfoff
+toggle item-esp off
+wait 40
+perf without item-esp and those above
+wait 200
+perfoff
+toggle player-esp off
+wait 40
+perf without player-esp and those above
+wait 200
+perfoff
+toggle name-tags off
+wait 40
+perf without name-tags and those above
+wait 200
+perfoff
+toggle custom-hotbar off
+wait 40
+perf without custom-hotbar and those above
+wait 200
+perfoff
+toggle no-render off
+wait 40
+perf without no-render and those above
+wait 200
+perfoff
+toggle full-bright off
+wait 40
+perf without full-bright and those above
+wait 200
+perfoff
+shot all-off
+quit

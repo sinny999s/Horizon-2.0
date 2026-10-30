@@ -1,0 +1,14 @@
+#version 330
+#extension GL_ARB_separate_shader_objects : require
+
+// The original's core/default/colored_texture.fsh.
+uniform sampler2D Sampler0;
+
+layout(location = 0) in vec2 texCoord0;
+layout(location = 1) in vec4 vertexColor;
+
+layout(location = 0) out vec4 color;
+
+void main() {
+    color = texture(Sampler0, texCoord0) * vertexColor;
+}

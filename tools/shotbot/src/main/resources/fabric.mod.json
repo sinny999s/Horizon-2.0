@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "shotbot",
+  "version": "1.0.0",
+  "name": "ShotBot",
+  "environment": "client",
+  "entrypoints": { "client": ["shot.ShotBot"] },
+  "mixins": ["shotbot.mixins.json"],
+  "depends": { "fabricloader": "*", "fabric-api": "*" }
+}

@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.cosmetic2",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "CameraMixin",
+    "FogRendererMixin",
+    "FirstPersonHandsAndItemsRendererMixin",
+    "LivingEntitySwingMixin",
+    "LocalPlayerActivationMixin",
+    "ItemFeatureRendererMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

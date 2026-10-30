@@ -1,0 +1,44 @@
+# ShotBot test for StashFinder and NewChunks Isolated Old Chunk Detector
+title 40
+world
+wait 50
+
+cmd gamerule spawn_mobs false
+cmd gamerule send_command_feedback true
+cmd time set noon
+cmd weather clear
+cmd tp @s 2000.5 -60 2000.5 0 0
+wait 60
+cmd kill @e[type=!player]
+
+# 1. Place stash cluster fully inside chunk 125, 125 (X: 2000..2015, Z: 2000..2015)
+#    5 shulker boxes + 15 chests = 20 containers
+cmd fill 2002 -60 2004 2006 -60 2004 minecraft:shulker_box
+cmd fill 2002 -60 2006 2006 -60 2008 minecraft:chest
+wait 20
+
+# 2. Place a single control chest in chunk 127 (X: 2035) -> should NOT trigger StashFinder
+cmd setblock 2035 -60 2000 minecraft:chest
+wait 15
+
+# Verify StashFinder detected the stash cluster and renders box, label, and tracers
+cmd tp @s 2004.5 -55 1998.5 0 25
+wait 15
+shot 1_stash_finder_alert_and_box
+
+# 3. Test NewChunks:
+#    Place settled flowing water in chunk 125, 125 (marks chunk old)
+#    Place source water spreading to flowing water in chunk 126, 125 (marks chunk new)
+#    Isolated old chunk detector flags chunk 125 as an island (size 1 <= maxCluster 4)
+cmd setblock 2008 -60 2008 minecraft:water[level=2]
+wait 10
+cmd setblock 2018 -60 2008 minecraft:water[level=0]
+cmd setblock 2019 -60 2008 minecraft:water[level=1]
+wait 25
+
+cmd tp @s 2004.5 -40 2004.5 0 45
+wait 15
+shot 2_newchunks_and_island
+
+wait 15
+quit

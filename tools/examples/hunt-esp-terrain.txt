@@ -1,0 +1,45 @@
+# Portal Pattern Finder and Tunnel ESP in real terrain with 6b6t's seed, where nobody has been: everything they report
+# here is a false positive. Overworld, then the nether. At each spot, how much cave air and plain air there is: the
+# cave air part of the finder only works where caves are cave air (see hunt-cave-air.txt).
+# Setup:  python tools/testcfg.py setup portal-pattern-finder notify=true -- tunnel-esp notify=true
+# Run:    sh tools/run-test.sh tools/examples/hunt-esp-terrain.txt
+# Restore: python tools/testcfg.py restore
+title 40
+world normal -4172144997902289642
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd gamemode spectator
+cmd say overworld 1
+cmd tp @s 5000 40 5000
+wait 400
+shot overworld-1
+cmd say counting cave air then air at 5000 -20 5000
+cmd fill 5000 -20 5000 5031 11 5031 stone replace cave_air
+cmd fill 5000 -20 5000 5031 11 5031 stone replace air
+wait 5
+cmd say overworld 2
+cmd tp @s -8000 20 3000
+wait 400
+shot overworld-2
+cmd say counting cave air then air at -8000 -20 3000
+cmd fill -8000 -20 3000 -7969 11 3031 stone replace cave_air
+cmd fill -8000 -20 3000 -7969 11 3031 stone replace air
+wait 5
+cmd say nether 1
+cmd execute in minecraft:the_nether run tp @s 3000 60 3000
+wait 500
+shot nether-1
+cmd say counting cave air then air at 3000 40 3000
+cmd fill 3000 40 3000 3031 71 3031 stone replace cave_air
+cmd fill 3000 40 3000 3031 71 3031 stone replace air
+wait 5
+cmd say nether 2
+cmd execute in minecraft:the_nether run tp @s -2000 40 6000
+wait 500
+shot nether-2
+cmd say counting cave air then air at -2000 40 6000
+cmd fill -2000 40 6000 -1969 71 6031 stone replace cave_air
+cmd fill -2000 40 6000 -1969 71 6031 stone replace air
+wait 5
+cmd say done
+quit

@@ -1,0 +1,34 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.horizon.client.mixin.world",
+  "compatibilityLevel": "JAVA_25",
+  "client": [
+    "AutoSignScreenAccessor",
+    "ContainerSlotRenderMixin",
+    "NoRenderHudMixin",
+    "NoRenderBossBarMixin",
+    "NoRenderScreenMixin",
+    "NoRenderSignMixin",
+    "NoRenderArmorMixin",
+    "NoRenderMapMixin",
+    "NoRenderWeatherMixin",
+    "NoRenderWorldBorderMixin",
+    "NoRenderDarknessMixin",
+    "NoRenderBlindnessMixin",
+    "NoRenderOverlayMixin",
+    "NoRenderPlayerStateMixin",
+    "NoRenderSpawnerMixin",
+    "NoRenderHurtTiltMixin",
+    "NoRenderFireMixin",
+    "NoRenderAlphaMixin",
+    "NoRenderParticleMixin",
+    "NoRenderFogMixin",
+    "FreeCamCameraMixin",
+    "ZoomCameraMixin",
+    "TpsSyncLocalPlayerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
