@@ -40,6 +40,7 @@ object AutoUpdater {
     private var checking = false
 
     fun checkOnStartup() {
+        cleanupOldJars()
         if (!Storage.shared.autoUpdate) return
         thread(name = "Horizon-AutoUpdater", isDaemon = true) {
             // Wait 5 seconds after launch to ensure game settles before network request
@@ -176,8 +177,8 @@ object AutoUpdater {
                 val destStr = destJar.toAbsolutePath().toString()
 
                 if (isWindows) {
-                    // Give java.exe 2 seconds to release the file lock, then delete old and move new
-                    val cmd = "timeout /t 2 /nobreak >nul & del /f /q \"$oldStr\" & move /y \"$newStr\" \"$destStr\""
+                    // Give java.exe 2 seconds to release file lock, then delete old and move new
+                    val cmd = "ping 127.0.0.1 -n 3 >nul & del /f /q \"$oldStr\" & move /y \"$newStr\" \"$destStr\""
                     ProcessBuilder("cmd.exe", "/c", cmd).start()
                 } else {
                     val cmd = "sleep 2 && rm -f \"$oldStr\" && mv \"$newStr\" \"$destStr\""
@@ -187,6 +188,30 @@ object AutoUpdater {
                 HorizonClient.LOG.warn("Failed to execute update swap script", e)
             }
         })
+    }
+
+    private fun cleanupOldJars() {
+        try {
+            val container = FabricLoader.getInstance().getModContainer(HorizonClient.ID).orElse(null) ?: return
+            val currentJar = container.origin.paths.firstOrNull() ?: return
+            if (!currentJar.toString().endsWith(".jar")) return
+            val modsDir = currentJar.parent ?: return
+
+            java.nio.file.Files.list(modsDir).use { stream ->
+                stream.filter { p ->
+                    val name = p.fileName.toString()
+                    name.startsWith("horizon-") && name.endsWith(".jar") && p != currentJar
+                }.forEach { old ->
+                    try {
+                        java.nio.file.Files.deleteIfExists(old)
+                        HorizonClient.LOG.info("AutoUpdater: Cleaned up old jar {}", old.fileName)
+                    } catch (ignored: Exception) {
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            HorizonClient.LOG.warn("Failed cleaning up old jars", e)
+        }
     }
 
     fun isNewer(latestTag: String, current: String): Boolean {
