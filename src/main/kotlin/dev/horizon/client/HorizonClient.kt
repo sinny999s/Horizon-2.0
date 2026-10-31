@@ -75,6 +75,7 @@ object HorizonClient : ClientModInitializer {
             Hud.tick()
             Proxies.tick()
             Macros.tick()
+            dev.horizon.client.render.CapePhysics.tick(mc)
             val now = System.currentTimeMillis()
             val windowsOpen = mc.gui.screen() === dev.horizon.client.gui.modern.ModernWindows
             val interval = if (windowsOpen) 2500L else 60000L

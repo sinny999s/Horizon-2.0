@@ -79,11 +79,7 @@ class Cape : Module("cape", Categories.COSMETIC) {
 
     val style = enum("style", Style.MIGRATOR)
     val elytra = bool("elytra", true)
-    val physics = bool("physics", true)
-    val waveStrength = float("wave-strength", 1.0f, 0.2f..2.5f) { physics.value }
-    val gravity = float("gravity", 1.0f, 0.2f..2.0f) { physics.value }
-    val stiffness = float("stiffness", 1.0f, 0.2f..2.0f) { physics.value }
-    val onlySelf = bool("only-self", true) { physics.value }
+    val waveyCapes = bool("wavey-capes", true)
 
     private val textures = HashMap<Style, ClientAsset.ResourceTexture>()
 
@@ -111,11 +107,18 @@ class Cape : Module("cape", Categories.COSMETIC) {
     /** [style]'s picture once it's uploaded; null while it's being fetched. */
     private fun texture(style: Style): ClientAsset.ResourceTexture? {
         textures[style]?.let { return it }
-        val image = fetched.remove(style)
-        if (image == null) {
-            fetch(style)
-            return null
+        val image = fetched.remove(style) ?: run {
+            val file = Storage.dir("capes").resolve("${style.hash}.png")
+            if (Files.exists(file)) {
+                try {
+                    ByteArrayInputStream(Files.readAllBytes(file)).use { ImageIO.read(it) }
+                } catch (_: Throwable) { null }
+            } else {
+                fetch(style)
+                null
+            }
         }
+        if (image == null) return null
         val id = Identifier.fromNamespaceAndPath(HorizonClient.ID, "textures/capes/${style.name.lowercase()}.png")
         mc.textureManager.register(id, Textures.upload("cape $style", image))
         return ClientAsset.ResourceTexture(id, id).also { textures[style] = it }

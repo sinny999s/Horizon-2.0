@@ -45,7 +45,7 @@ public abstract class CapeLayerMixin {
 		if (texturePath == null) return;
 
 		this.model.setupAnim(state);
-		boolean handled = CapePhysics.INSTANCE.render(poseStack, collector, lightCoords, state, texturePath, this.model.body);
+		boolean handled = CapePhysics.INSTANCE.render(poseStack, collector, lightCoords, state, texturePath, this.model.root(), this.model.body);
 		if (handled) {
 			poseStack.popPose();
 			ci.cancel();
