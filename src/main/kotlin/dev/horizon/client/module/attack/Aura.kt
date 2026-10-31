@@ -357,8 +357,7 @@ class Aura : Module("aura", Categories.ATTACK) {
                 val ent = pk.getEntity(level)
                 val t = target
                 if (pk.eventId.toInt() == 48 && t != null && ent === t) {
-                    Notifications.post("Aura", "Успешно сломали щит " +
-                        "игроку " + t.name.string, 2f, NotificationType.SUCCESS)
+                    Notifications.post("Aura", "Shield disabled for " + t.name.string, 2f, NotificationType.SUCCESS)
                 }
                 if (pk.eventId.toInt() == 3 && p != null && ent === p && disableOnDeath.value) {
                     mc.execute {

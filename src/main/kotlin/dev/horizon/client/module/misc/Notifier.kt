@@ -136,7 +136,7 @@ class Notifier : Module("notifier", Categories.MISC) {
         on<EntityRemoveEvent> { e -> removed(e) }
         on<PlayerDeathEvent> { e ->
             if (!totemPops.value) return@on
-            Misc2Util.chat(this, e.player.name.string + " " + String.format("died after popping %d тотем(ов)!", e.totemsPopped))
+            Misc2Util.chat(this, e.player.name.string + " " + String.format("died after popping %d totem(s)!", e.totemsPopped))
         }
         on<PlayerUpdateEvent> { tick() }
     }
@@ -145,13 +145,13 @@ class Notifier : Module("notifier", Categories.MISC) {
     /** The original's `au.r`: a player popped a totem ([count] so far); the pop sound at most every 3 s. */
     fun onPop(name: String, count: Int) {
         if (!totemPops.value) return
-        Misc2Util.chat(this, name + " " + String.format("was popped %d totem(s)!", count))
+        Misc2Util.chat(this, name + " " + String.format("popped %d totem(s)!", count))
 
     }
 
     private fun warnings() {
         val p = mc.player ?: return
-        if (!airAlarmTimer.passed(3000) && airAlarm) warning(loudspeakerIcon, loudspeakerEmptyIcon, "WARNING!", "Air allarm!")
+        if (!airAlarmTimer.passed(3000) && airAlarm) warning(loudspeakerIcon, loudspeakerEmptyIcon, "WARNING!", "Air alarm!")
         if (lowArmor.value) {
             for (s in listOf(p.inventory.getItem(39), p.inventory.getItem(38), p.inventory.getItem(37), p.inventory.getItem(36))) {
                 if (s.isEmpty || durability(s) >= 20 || s.maxDamage == 0) continue
@@ -161,7 +161,7 @@ class Notifier : Module("notifier", Categories.MISC) {
             }
         }
         if (lag.value && ServerWatch.sinceTimePacket() - 5000L > 0 && !mc.isLocalServer && p.tickCount > 60) {
-            warning(wifiIcon, wifiOffIcon, "The server is fucked up!", String.format("time from last response: %s", seconds(ServerWatch.sinceTimePacket())))
+            warning(wifiIcon, wifiOffIcon, "Server Lag", String.format("No response for %s", seconds(ServerWatch.sinceTimePacket())))
 
             return
         }
