@@ -20,6 +20,7 @@
     "GlowMinecraftMixin",
     "GlowEntityMixin",
     "SkinMixin",
+    "CapeLayerMixin",
     "MenuPanoramaMixin",
     "GuiGraphicsExtractorAccessor",
     "GuiGraphicsExtractorMixin",

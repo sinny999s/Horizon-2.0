@@ -79,6 +79,11 @@ class Cape : Module("cape", Categories.COSMETIC) {
 
     val style = enum("style", Style.MIGRATOR)
     val elytra = bool("elytra", true)
+    val physics = bool("physics", true)
+    val waveStrength = float("wave-strength", 1.0f, 0.2f..2.5f) { physics.value }
+    val gravity = float("gravity", 1.0f, 0.2f..2.0f) { physics.value }
+    val stiffness = float("stiffness", 1.0f, 0.2f..2.0f) { physics.value }
+    val onlySelf = bool("only-self", true) { physics.value }
 
     private val textures = HashMap<Style, ClientAsset.ResourceTexture>()
 

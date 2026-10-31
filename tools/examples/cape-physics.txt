@@ -1,0 +1,16 @@
+title 40
+world
+wait 60
+cmd gamerule spawn_mobs false
+cmd kill @e[type=!player]
+cmd tp @p 2000.5 -60.0 2000.5 0 0
+wait 40
+key F5
+key F5
+wait 20
+shot cape-thirdperson-idle
+hold keyUp 40
+shot cape-walking
+wait 30
+shot cape-standing
+quit
