@@ -37,6 +37,7 @@ object Storage {
         var rpcAsked: Boolean = false,
         /** Not in the original: the redesign's themes (ThemeData.presets) were added to the list once. */
         var themePresets: Boolean = false,
+        var autoUpdate: Boolean = true,
     )
 
     var shared = Shared()

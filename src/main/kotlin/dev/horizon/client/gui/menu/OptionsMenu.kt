@@ -3,6 +3,8 @@ package dev.horizon.client.gui.menu
 import com.mojang.blaze3d.platform.InputConstants
 import com.mojang.blaze3d.platform.cursor.CursorTypes
 import dev.horizon.client.compat.SodiumOptions
+import dev.horizon.client.config.Storage
+import dev.horizon.client.updater.AutoUpdater
 import dev.horizon.client.gui.Cursor
 import dev.horizon.client.gui.Fps
 import dev.horizon.client.gui.Keys
@@ -103,6 +105,14 @@ class OptionsMenu(val vanilla: OptionsScreen) : Screen(Component.translatable("o
         list += Page(GENERAL, "Field of view, and the rest of the options", {
             buildList {
                 add(Vanilla(options.fov()))
+                add(Header("Horizon 2.0"))
+                add(Toggle("Auto-update", { Storage.shared.autoUpdate }) {
+                    Storage.shared.autoUpdate = it
+                    Storage.saveShared()
+                })
+                add(Link("Check for updates", if (AutoUpdater.status.isNotBlank()) AutoUpdater.status else "Current: v${AutoUpdater.currentVersion}") {
+                    AutoUpdater.check(manual = true)
+                })
                 if (more.isNotEmpty()) add(Header("More"))
                 for (b in more) add(Link(b.message.string, "") { b.onPress(KeyEvent(InputConstants.KEY_RETURN, 0, 0)) })
             }

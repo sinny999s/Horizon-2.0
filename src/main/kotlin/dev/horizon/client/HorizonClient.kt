@@ -59,6 +59,7 @@ object HorizonClient : ClientModInitializer {
             PreLaunch.hide()
             ConfigImport.runIfFirstStart()
             Configs.startup()
+            dev.horizon.client.updater.AutoUpdater.checkOnStartup()
         }
         // The original saved every 60 s in a world (every 2.5 s while the Windows screen is open) and at shutdown.
         ClientTickEvents.END_CLIENT_TICK.register { mc ->
