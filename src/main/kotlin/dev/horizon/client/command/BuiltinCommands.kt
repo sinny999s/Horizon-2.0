@@ -246,3 +246,66 @@ object NeofetchCommand : ClientCommand("neofetch") {
         builder.executes { 1 }
     }
 }
+
+
+/** Not in the original: copies current position and corresponding dimension coordinates to clipboard. */
+object CoordsCommand : ClientCommand("coords") {
+    override fun build(builder: Builder) {
+        builder.executes {
+            val p = mc.player
+            if (p == null) {
+                message(ChatFormatting.RED.toString() + "Not in a world!")
+                return@executes 1
+            }
+            val x = p.blockX
+            val y = p.blockY
+            val z = p.blockZ
+            val dim = p.level().dimension()
+            val isNether = dim == net.minecraft.world.level.Level.NETHER
+
+            val (otherX, otherZ, otherDimName) = if (isNether) {
+                Triple(x * 8, z * 8, "Overworld")
+            } else {
+                Triple(x / 8, z / 8, "Nether")
+            }
+
+            val clip = "$x $y $z"
+            mc.keyboardHandler.clipboard = clip
+
+            message(
+                ChatFormatting.GREEN.toString() + "Coords: " +
+                ChatFormatting.WHITE + "$x $y $z " +
+                ChatFormatting.GRAY + "[$otherDimName: $otherX $y $otherZ] " +
+                ChatFormatting.YELLOW + "(copied to clipboard)"
+            )
+            1
+        }
+    }
+}
+
+/** Not in the original: client update status and manual check command. */
+object UpdateCommand : ClientCommand("update") {
+    override fun build(builder: Builder) {
+        builder.then(literal("check").executes {
+            message(ChatFormatting.GRAY.toString() + "Checking for Horizon updates...")
+            dev.horizon.client.updater.AutoUpdater.check(manual = true)
+            1
+        })
+        builder.then(literal("toggle").executes {
+            val next = !dev.horizon.client.config.Storage.shared.autoUpdate
+            dev.horizon.client.config.Storage.shared.autoUpdate = next
+            dev.horizon.client.config.Storage.saveShared()
+            message(ChatFormatting.GRAY.toString() + "Auto-update is now " + (if (next) ChatFormatting.GREEN.toString() + "ENABLED" else ChatFormatting.RED.toString() + "DISABLED"))
+            1
+        })
+        builder.executes {
+            message(
+                ChatFormatting.GREEN.toString() + "Horizon 2.0 " +
+                ChatFormatting.GRAY + "(v" + dev.horizon.client.updater.AutoUpdater.currentVersion + ")\n" +
+                ChatFormatting.GRAY + "> Status: " + ChatFormatting.WHITE + (dev.horizon.client.updater.AutoUpdater.status.ifBlank { "Up to date" }) + "\n" +
+                ChatFormatting.DARK_GRAY + "Use '^update check' to check now, or '^update toggle' to switch auto-update."
+            )
+            1
+        }
+    }
+}

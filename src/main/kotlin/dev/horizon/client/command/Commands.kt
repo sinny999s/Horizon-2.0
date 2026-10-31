@@ -42,11 +42,12 @@ object Commands {
     val dispatcher = CommandDispatcher<ClientSuggestionProvider>()
 
     fun init() {
-        for (c in listOf(FixAllCommand, BindCommand, ConfigCommand, NeofetchCommand, AngleCommand, GpsCommand, FriendCommand, WaypointCommand, WpCommand)) add(c)
+        for (c in listOf(FixAllCommand, BindCommand, ConfigCommand, NeofetchCommand, AngleCommand, GpsCommand, FriendCommand, WaypointCommand, WpCommand, CoordsCommand, UpdateCommand)) add(c)
         EventBus.on<SendMessageEvent>(this) { e ->
-            if (!e.message.startsWith(prefix)) return@on
+            val p = if (e.message.startsWith(prefix)) prefix else if (e.message.startsWith(".")) "." else null
+            if (p == null) return@on
             try {
-                dispatcher.execute(e.message.substring(prefix.length), mc.connection!!.suggestionsProvider)
+                dispatcher.execute(e.message.substring(p.length), mc.connection!!.suggestionsProvider)
             } catch (_: CommandSyntaxException) {
             }
             e.cancel()
