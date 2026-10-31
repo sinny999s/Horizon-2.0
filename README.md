@@ -63,7 +63,7 @@
 
 1. Install **[Fabric Loader](https://fabricmc.net/) 0.20+** for **Minecraft 26.3**.
 2. Download and install **[Fabric API](https://modrinth.com/mod/fabric-api)**.
-3. Drop `horizon-26.3-0.1.0.jar` into your `.minecraft/mods` folder.
+3. Drop `horizon-26.3-2.0.0.jar` into your `.minecraft/mods` folder.
 4. Launch the game.
 
 > [!TIP]
@@ -104,7 +104,7 @@ cd Horizon-2.0
 .\gradlew.bat build
 ```
 
-The compiled mod will be generated in `build/libs/horizon-26.3-0.1.0.jar`.
+The compiled mod will be generated in `build/libs/horizon-26.3-2.0.0.jar`.
 
 ---
 
