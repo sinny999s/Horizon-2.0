@@ -15,6 +15,16 @@ import dev.horizon.client.module.attack.HoleFiller
 import dev.horizon.client.module.attack.MaceKiller
 import dev.horizon.client.module.attack.MoreKnockback
 import dev.horizon.client.module.attack.Trap
+import dev.horizon.client.module.attack.BedAura
+import dev.horizon.client.module.attack.AnchorAura
+import dev.horizon.client.module.equip.AutoDrop
+import dev.horizon.client.module.world.ChestAura
+import dev.horizon.client.module.misc.DiscordAlerts
+import dev.horizon.client.module.player.AutoMount
+import dev.horizon.client.module.world.HighwayBuilder
+import dev.horizon.client.module.rage.EntityControl
+import dev.horizon.client.module.cosmetic.Ambience
+import dev.horizon.client.module.protect.ArmorAlert
 import dev.horizon.client.module.basic.AntiKnockBack
 import dev.horizon.client.module.basic.Avoid
 import dev.horizon.client.module.basic.ElytraRecast
@@ -378,5 +388,15 @@ object HorizonModules {
         Modules.register(PortalPatternFinder())
         Modules.register(TunnelEsp())
         Modules.register(Announce())
+        Modules.register(BedAura())
+        Modules.register(AnchorAura())
+        Modules.register(AutoDrop())
+        Modules.register(ChestAura())
+        Modules.register(DiscordAlerts())
+        Modules.register(AutoMount())
+        Modules.register(HighwayBuilder())
+        Modules.register(EntityControl())
+        Modules.register(Ambience())
+        Modules.register(ArmorAlert())
     }
 }

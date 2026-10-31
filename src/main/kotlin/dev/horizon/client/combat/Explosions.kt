@@ -54,14 +54,15 @@ object Explosions {
 
     /** The original's `qh.k`: damage to [entity] from a crystal exploding at [center], with its box [ticks] ahead. */
     fun damage(center: Vec3, entity: LivingEntity, ticks: Int, terrainIgnore: Boolean, ghost: Collection<BlockPos>,
-               solid: Collection<BlockPos>): Float {
+               solid: Collection<BlockPos>, power: Float = 6.0f): Float {
         val level = mc.level ?: return 0f
         val box = if (ticks > 0) Predictor.box(entity, ticks) else entity.boundingBox
-        val dist = box.center.subtract(0.0, box.ysize / 2, 0.0).distanceTo(center) / 12.0
+        val doublePower = (power * 2.0)
+        val dist = box.center.subtract(0.0, box.ysize / 2, 0.0).distanceTo(center) / doublePower
         if (level.difficulty == Difficulty.PEACEFUL || dist > 1.0 || (entity is Player && entity.isCreative)) return 0f
         val seen = exposure(center, box, terrainIgnore, ghost, solid)
         val d = (1.0 - dist) * seen
-        var dmg = ((d * d + d) / 2.0 * 7.0 * 12.0 + 1.0).toFloat()
+        var dmg = ((d * d + d) / 2.0 * 7.0 * doublePower + 1.0).toFloat()
         if (level.difficulty == Difficulty.EASY) dmg = min(dmg / 2f + 1f, dmg)
         if (level.difficulty == Difficulty.HARD) dmg *= 1.5f
         val src = source ?: level.damageSources().source(DamageTypes.EXPLOSION).also { source = it }
