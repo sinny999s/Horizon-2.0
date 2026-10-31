@@ -130,7 +130,7 @@ class Announce : Module("announce", Categories.MISC) {
 Horizon 2.0 is out now! Next-gen Minecraft 26.3 utility client: github.com/sinny999s/Horizon-2.0
 Upgrade to Horizon 2.0 - Fast AutoCrystal, Elytra Autopilot & Modern Glass UI: github.com/sinny999s/Horizon-2.0
 Dominate PvP with Horizon 2.0 for 26.3 | Free & Open Source: github.com/sinny999s/Horizon-2.0
-Explore with Horizon 2.0: Hunt Map, BaseFinder & AutoCraft: github.com/sinny999s/Horizon-2.0
+Hunt stashes and bases with Horizon 2.0 (Hunt Map & BaseFinder): github.com/sinny999s/Horizon-2.0
         """.trimIndent()
     }
 }
