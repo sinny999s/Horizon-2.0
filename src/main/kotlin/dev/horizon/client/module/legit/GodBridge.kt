@@ -70,6 +70,8 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     val autoAngle = enum("auto-angle", AngleMode.SMOOTH_DIAGONAL) { mode.value == Mode.GOD_BRIDGE }
     val aimSpeed = float("aim-speed", 300.0f, 60.0f..600.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value == AngleMode.SMOOTH_DIAGONAL }
     val targetPitch = float("target-pitch", 76.5f, 65.0f..85.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value != AngleMode.NONE }
+    val autoJump = bool("auto-jump", true) { mode.value == Mode.GOD_BRIDGE }
+    val jumpInterval = int("jump-interval", 7, 3..15) { mode.value == Mode.GOD_BRIDGE && autoJump.value }
     val activationBlocks = int("activation-blocks", 0, 0..10) { mode.value == Mode.GOD_BRIDGE }
     val placeDelay = int("place-delay", 0, 0..5) { mode.value == Mode.GOD_BRIDGE }
     val requireRightClick = bool("require-right-click", false) { mode.value == Mode.GOD_BRIDGE }
@@ -84,6 +86,8 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     private var sneaking = false
     private var sneakTimer = 0
     private var placedCount = 0
+    private var bridgeBlocksPlaced = 0
+    private var jumpCooldown = 0
     private var lastPlaceTick = 0
     private var lastTargetPos: BlockPos? = null
     private var currentPlacement: BlockHitResult? = null
@@ -102,6 +106,8 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         sneaking = false
         sneakTimer = 0
         placedCount = 0
+        bridgeBlocksPlaced = 0
+        jumpCooldown = 0
         lastPlaceTick = 0
         lastTargetPos = null
         currentPlacement = null
@@ -235,6 +241,16 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                 lastTargetPos = placement.blockPos.relative(placement.direction)
                 mc.gameMode?.useItemOn(p, InteractionHand.MAIN_HAND, placement)
                 PlaceBoxes.add(placement.blockPos.relative(placement.direction), Theme.primary or (0xFF shl 24), Theme.primary or (0x44 shl 24), Animation.Fade, Render.BOTH)
+                bridgeBlocksPlaced++
+
+                // Auto Jump check: every jumpInterval blocks (default 7), jump to ascend 1 block elevation
+                if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
+                    bridgeBlocksPlaced = 0
+                    if (p.onGround()) {
+                        p.jumpFromGround()
+                        jumpCooldown = 6
+                    }
+                }
             }
         }
 
