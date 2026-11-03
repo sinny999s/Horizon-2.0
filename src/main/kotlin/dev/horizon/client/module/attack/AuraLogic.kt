@@ -2,11 +2,13 @@ package dev.horizon.client.module.attack
 
 import dev.horizon.client.combat.Packets
 import dev.horizon.client.combat.PlayerState
+import dev.horizon.client.combat.Rng
 import dev.horizon.client.combat.Rotation
 import dev.horizon.client.combat.Scheduler
 import dev.horizon.client.config.Friends
 import dev.horizon.client.module.Modules
 import dev.horizon.client.module.basic.Sprint
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.module.rage.MaceElytraTarget
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -86,12 +88,13 @@ class AuraTargets(private val aura: Aura) {
         return abs(Mth.wrapDegrees(Math.toDegrees(atan2(e.z - p.z, e.x - p.x)) - 90.0) - Mth.wrapDegrees(p.yRot)).toFloat()
     }
 
-    /** The original's `vt.B`. */
+    /** The original's `vt.B` (extended by `swing-range` when 1.8 combat pre-swinging is active). */
     fun searchRange(): Float {
         val p = mc.player!!
+        val base = if (aura.isLegacyCombat()) aura.range.value + aura.swingRange.value else aura.range.value
         var r = aura.range.value + 2.0f
         if (p.isFallFlying || Modules.get<MaceElytraTarget>().enabled) r += 64.0f
-        return if (aura.effectiveRotation().extendsSearch(aura)) r else aura.range.value
+        return if (aura.effectiveRotation().extendsSearch(aura)) max(r, base) else base
     }
 
     /** From the cached eyes to the aim point of the rotation-mode setting (not the effective mode, as in the original). */
@@ -116,10 +119,11 @@ class AuraTargets(private val aura: Aura) {
         if (e is Player) {
             if (e === p) return true
             if (Friends.isFriend(e.gameProfile.name)) return true
+            if (Teams.isTeammate(e)) return true
             if (e.isCreative && aura.ignoreCreative.value) return true
             if (e.armorValue == 0 && aura.ignoreNaked.value) return true
             if (e.isInvisible && aura.ignoreInvisibleEntities.value) return true
-            if (e.teamColor == p.teamColor && aura.ignoreTeam.value && p.teamColor != 0xFFFFFF) return true
+            if (aura.ignoreTeam.value && (p.team?.isAlliedTo(e.team) == true || Teams.rawScoreboardSameColor(p, e))) return true
         }
         if (!inRange(e)) return true
         if (e.hasCustomName() && aura.ignoreNamed.value) return true
@@ -180,7 +184,7 @@ class AuraTargets(private val aura: Aura) {
     }
 }
 
-/** The original's `co`: when Aura may hit next. */
+/** The original's `co`: when Aura may hit next (millisecond-paced via [LegacyClicker] in 1.8 combat). */
 class AttackTimer(private val aura: Aura) : AuraHook {
     /** Ticks until the next hit. */
     var countdown = 0
@@ -188,13 +192,23 @@ class AttackTimer(private val aura: Aura) : AuraHook {
     /** The original's `co.E`: the last value [post] gave [countdown] (elytra-target compares the two). */
     var scheduled = 0
     private var counter = 0
+    private val clicker = LegacyClicker.State()
+
+    fun reset() {
+        countdown = 0
+        scheduled = 0
+        clicker.reset()
+    }
 
     override fun tick() {
         countdown -= 1
     }
 
-    /** The original's `co.R(n)`: due within [n] ticks and the crit timing allows it (or old-delay). */
-    fun ready(n: Int): Boolean = (critGate(n) || aura.oldDelay.value) && countdown - n <= 0
+    /** The original's `co.R(n)`: due within [n] ticks and the crit timing allows it (or 1.8 clicker ready). */
+    fun ready(n: Int): Boolean {
+        if (aura.isLegacyCombat()) return clicker.ready(System.nanoTime() / 1_000_000L, n)
+        return critGate(n) && countdown - n <= 0
+    }
 
     private fun critGate(n: Int): Boolean {
         val p = mc.player ?: return false
@@ -238,13 +252,10 @@ class AttackTimer(private val aura: Aura) : AuraHook {
 
     /** The original's `co.r`: schedule the next hit. */
     override fun post(rotation: Rotation) {
-        val tA = (20.0f / aura.minCps.value).toInt() - 1
-        val tB = (20.0f / aura.maxCps.value).toInt() - 1
-        val lo = min(tA, tB)
-        val hi = max(tA, tB)
         counter++
-        countdown = if (aura.oldDelay.value) {
-            ((lo..hi).random(Random.Default) + sin((System.currentTimeMillis() % 100) / 100.0 * 2 * PI) * 1.5 + 1.5).toInt().coerceIn(lo, hi)
+        countdown = if (aura.isLegacyCombat()) {
+            val ms = clicker.onClick(System.nanoTime() / 1_000_000L, aura.minCps.value, aura.maxCps.value, aura.clickPattern.value)
+            max(1, (ms / 50.0).toInt())
         } else {
             baseDelay()
         }
@@ -289,16 +300,17 @@ class AttackTimer(private val aura: Aura) : AuraHook {
     }
 }
 
-/** The original's `h0`: sprint resets around Aura's hits. */
+/** The original's `h0`: sprint resets around Aura's hits (1.9+ falling-crit reset, or 1.8 post-hit W-tap). */
 class SprintHook(private val aura: Aura, private val timer: AttackTimer, private val offhand: OffhandSwapHook) : AuraHook {
     /** A legit sprint reset is running: sprinting is held off. */
     var resetting = false
     private var packetSprint = false
 
-    private fun swapPending() = aura.offhandHitSwap.value && offhand.find() != -1
+    private fun swapPending() = !aura.isLegacyCombat() && aura.offhandHitSwap.value && offhand.find() != -1
 
     /** The original's `h0.U`: may start a legit reset (then this tick doesn't hit). */
     fun gate(ready: Boolean): Boolean {
+        if (aura.isLegacyCombat()) return ready
         val p = mc.player ?: return ready
         val mode = aura.sprint.value
         val legitExtra = mode == Aura.Sprint.LEGIT_EXTRA
@@ -329,6 +341,15 @@ class SprintHook(private val aura: Aura, private val timer: AttackTimer, private
     override fun pre() {
         val p = mc.player ?: return
         if (!(PlayerState.serverSprinting && !p.isSwimming)) return
+        if (aura.isLegacyCombat()) {
+            val hurt = (aura.target as? LivingEntity)?.hurtTime ?: 0
+            if (aura.sprint.value == Aura.Sprint.HVH && hurt <= 1) {
+                packetSprint = true
+                p.isSprinting = false
+                Packets.send(ServerboundPlayerCommandPacket(p, ServerboundPlayerCommandPacket.Action.STOP_SPRINTING))
+            }
+            return
+        }
         if (aura.offhandHitSwap.value) return
         if (aura.sprint.value != Aura.Sprint.NORMAL && aura.sprint.value != Aura.Sprint.HVH) return
         if (p.onGround()) return
@@ -344,8 +365,21 @@ class SprintHook(private val aura: Aura, private val timer: AttackTimer, private
             Packets.send(ServerboundPlayerCommandPacket(p, ServerboundPlayerCommandPacket.Action.START_SPRINTING))
             packetSprint = false
         }
-        resetting = false
         val m = aura.sprint.value
+        if (aura.isLegacyCombat()) {
+            val hurt = (aura.target as? LivingEntity)?.hurtTime ?: 0
+            if ((m == Aura.Sprint.LEGIT || m == Aura.Sprint.LEGIT_EXTRA) && p.isSprinting && !resetting && hurt <= 1) {
+                val legitExtra = m == Aura.Sprint.LEGIT_EXTRA
+                if (legitExtra) PlayerState.releaseMovementKeys()
+                p.isSprinting = false
+                Modules.get<Sprint>().skipOnce = true
+                mc.options.keySprint.isDown = false
+                resetting = true
+                Scheduler.ticks(Rng.int(1, 2)) { restore(legitExtra) }
+            }
+            return
+        }
+        resetting = false
         if (m == Aura.Sprint.LEGIT_EXTRA || m == Aura.Sprint.LEGIT || swapPending()) {
             if (m == Aura.Sprint.LEGIT_EXTRA) PlayerState.resyncMovementKeys()
             p.isSprinting = PlayerState.physical(mc.options.keyUp)

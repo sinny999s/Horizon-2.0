@@ -1,5 +1,6 @@
 package dev.horizon.client.module.attack
 
+import dev.horizon.client.combat.PlayerState
 import dev.horizon.client.combat.Rng
 import dev.horizon.client.combat.Rotation
 import net.minecraft.client.Minecraft
@@ -592,10 +593,9 @@ object AdvancedRotation : AuraRotation() {
 
 /**
  * Not in the original: aims like a hand on a mouse. Nothing is silent: the camera itself turns, every frame, and Aura only
- * hits when the crosshair is on the target. After a short reaction it steers toward a spot on the target's upper body
- * that wanders a little every half second or so, with a spring's ease (a quick start, a soft landing, sometimes a
- * slight overshoot on big turns, and a lag behind a target that moves), a top speed, and a faint hand tremor. Each turn
- * is made in whole mouse counts at your sensitivity, so it is always a turn a mouse could make.
+ * hits when the crosshair is on the target. Tunable through Aura's `legit` group (aim spot, min/max speed, smoothness,
+ * pitch-assist scale, hitbox-relax so it stops fighting your mouse once on target, reaction time, tremor, and
+ * require-click). Each turn is made in whole mouse counts at your sensitivity, so it is always a turn a mouse could make.
  */
 object LegitRotation : AuraRotation() {
     private var target: Entity? = null
@@ -608,18 +608,51 @@ object LegitRotation : AuraRotation() {
     private var spotTo = spot
     private var nextSpot = 0L
 
-    // This target's hand: spring stiffness, damping ratio and top speed (degrees a second).
-    private var stiffness = 70.0
-    private var damping = 0.85
-    private var topSpeed = 500.0
+    // Per-target slight hand variation around the configured speed & smoothness.
+    private var speedBias = 0.5
+    private var stiffJitter = 1.0
+    private var dampJitter = 1.0
     private var vYaw = 0.0
     private var vPitch = 0.0
     private var carryX = 0.0
     private var carryY = 0.0
-    private var tremor = 0.0
+    private var tremorPhase = 0.0
+    private var clickImpulse = 0.0
+
+    fun reset() {
+        target = null
+        vYaw = 0.0
+        vPitch = 0.0
+        carryX = 0.0
+        carryY = 0.0
+        clickImpulse = 0.0
+    }
+
+    /** Small organic click micro-vibration when a swing fires. */
+    fun onSwing() {
+        clickImpulse = 1.0
+    }
 
     override fun aimPoint(aura: Aura, target: Entity): Vec3 {
         val b = target.boundingBox
+        if (aura.aimSpot.value == Aura.LegitSpot.CLOSEST) {
+            val p = mc.player ?: return b.center
+            val eye = p.eyePosition
+            val dist = eye.distanceTo(b.center)
+            val look = viewVec(p.xRot, p.yRot)
+            val rayPt = eye.add(look.scale(dist))
+            val mx = b.xsize * 0.18
+            val my = b.ysize * 0.12
+            val mz = b.zsize * 0.18
+            val driftX = (spot.x - 0.5) * b.xsize * 0.12
+            val driftY = (spot.y - 0.68) * b.ysize * 0.10
+            val driftZ = (spot.z - 0.5) * b.zsize * 0.12
+            return Vec3(
+                clampD(rayPt.x + driftX, b.minX + mx, b.maxX - mx),
+                clampD(rayPt.y + driftY, b.minY + my, b.maxY - my),
+                clampD(rayPt.z + driftZ, b.minZ + mz, b.maxZ - mz)
+            )
+        }
         return Vec3(b.minX + b.xsize * spot.x, b.minY + b.ysize * spot.y, b.minZ + b.zsize * spot.z)
     }
 
@@ -633,7 +666,7 @@ object LegitRotation : AuraRotation() {
         val dt = if (last == 0L) 0.0 else ((now - last) / 1e9).coerceIn(0.0, 0.05)
         last = now
         val t = aura.target
-        if (t == null || mc.gui.screen() != null) {
+        if (t == null || mc.gui.screen() != null || (aura.requireClick.value && !PlayerState.physical(mc.options.keyAttack))) {
             target = null
             vYaw = 0.0
             vPitch = 0.0
@@ -642,22 +675,25 @@ object LegitRotation : AuraRotation() {
         if (t !== target) {
             target = t
             acquired = now
-            reaction = Rng.double(0.11, 0.23)
-            stiffness = Rng.double(55.0, 85.0)
-            damping = Rng.double(0.72, 0.95)
-            topSpeed = Rng.double(380.0, 620.0)
-            tremor = Rng.double(0.0, 100.0)
-            spot = randomSpot()
+            val rLo = minOf(aura.reactionMin.value, aura.reactionMax.value) / 1000.0
+            val rHi = maxOf(aura.reactionMin.value, aura.reactionMax.value) / 1000.0
+            reaction = if (rHi <= 0.0) 0.0 else Rng.double(rLo, rHi)
+            speedBias = Rng.double(0.0, 1.0)
+            stiffJitter = Rng.double(0.90, 1.10)
+            dampJitter = Rng.double(0.93, 1.07)
+            tremorPhase = Rng.double(0.0, 100.0)
+            spot = pickSpot(aura.aimSpot.value)
             spotTo = spot
             nextSpot = now
         }
         if ((now - acquired) / 1e9 < reaction) return
         if (now >= nextSpot) {
-            spotTo = randomSpot()
+            spotTo = pickSpot(aura.aimSpot.value)
             nextSpot = now + (Rng.double(0.35, 0.8) * 1e9).toLong()
         }
         val k = 1.0 - exp(-dt * 3.0)
         spot = spot.add(spotTo.subtract(spot).scale(k))
+        clickImpulse *= exp(-dt * 28.0)
 
         val aim = aimPoint(aura, t)
         val eye = p.eyePosition
@@ -668,25 +704,43 @@ object LegitRotation : AuraRotation() {
         val errYaw = Mth.wrapDegrees(wantYaw - p.yRot)
         val errPitch = wantPitch - p.xRot
 
-        // A spring toward the spot, pitch a little softer than yaw, capped at the hand's top speed.
-        val c = 2.0 * sqrt(stiffness) * damping
-        vYaw += (stiffness * errYaw - c * vYaw) * dt
-        vPitch += (stiffness * 0.8 * errPitch - c * vPitch) * dt
+        val smooth = aura.smoothness.value.toDouble().coerceIn(0.05, 1.0)
+        val stiffness = (155.0 * (1.0 - smooth * 0.84)) * stiffJitter
+        val damping = (0.72 + smooth * 0.30) * dampJitter
+        val sLo = minOf(aura.minAimSpeed.value, aura.maxAimSpeed.value).toDouble()
+        val sHi = maxOf(aura.minAimSpeed.value, aura.maxAimSpeed.value).toDouble()
+        val topSpeed = sLo + (sHi - sLo) * speedBias
+
+        val onBox = rayHitsTarget(t, Rotation(p.yRot, p.xRot), aura.range.value + 0.75f, true)
+        val relax = aura.hitboxRelax.value / 100.0
+        val pullScale = if (onBox) 1.0 - relax else 1.0
+        val dampBoost = if (onBox) 1.0 + relax * 2.0 else 1.0
+        val pitchScale = aura.pitchAssist.value / 100.0
+
+        val c = 2.0 * sqrt(stiffness) * damping * dampBoost
+        vYaw += (stiffness * pullScale * errYaw - c * vYaw) * dt
+        if (pitchScale <= 0.0) {
+            vPitch = 0.0
+        } else {
+            vPitch += (stiffness * 0.85 * pitchScale * pullScale * errPitch - c * vPitch) * dt
+        }
         val speed = hypot(vYaw, vPitch)
-        if (speed > topSpeed) {
+        if (speed > topSpeed && speed > 1e-6) {
             vYaw *= topSpeed / speed
             vPitch *= topSpeed / speed
         }
-        tremor += dt
-        val shakeYaw = sin(tremor * 9.1) * 0.6 + sin(tremor * 23.7) * 0.3
-        val shakePitch = sin(tremor * 7.3 + 1.7) * 0.5 + sin(tremor * 19.9) * 0.25
+
+        tremorPhase += dt
+        val tr = aura.tremor.value.toDouble() * (1.0 + clickImpulse * 0.65)
+        val shakeYaw = (sin(tremorPhase * 9.1) * 1.1 + sin(tremorPhase * 23.7) * 0.55) * tr
+        val shakePitch = (sin(tremorPhase * 7.3 + 1.7) * 0.9 + sin(tremorPhase * 19.9) * 0.45) * tr * max(pitchScale, 0.25)
 
         // In whole mouse counts: vanilla turns 1.2 x f^3 degrees a count, f being 0.6 x sensitivity + 0.2.
         val f = mc.options.sensitivity().get() * 0.6 + 0.2
         val perCount = f * f * f * 8.0
         val step = perCount * 0.15
         carryX += (vYaw + shakeYaw) * dt / step
-        carryY += (vPitch + shakePitch) * dt / step
+        carryY += if (pitchScale <= 0.0 && tr <= 0.0) 0.0 else (vPitch + shakePitch) * dt / step
         val countsX = carryX.toInt()
         val countsY = carryY.toInt()
         carryX -= countsX
@@ -694,6 +748,9 @@ object LegitRotation : AuraRotation() {
         if (countsX != 0 || countsY != 0) p.turn(countsX * perCount, countsY * perCount)
     }
 
-    /** A spot on the upper body: across the middle half of the box, from the chest to the neck. */
-    private fun randomSpot() = Vec3(Rng.double(0.3, 0.7), Rng.double(0.58, 0.86), Rng.double(0.3, 0.7))
+    private fun pickSpot(mode: Aura.LegitSpot): Vec3 = when (mode) {
+        Aura.LegitSpot.WANDER, Aura.LegitSpot.CLOSEST -> Vec3(Rng.double(0.30, 0.70), Rng.double(0.56, 0.86), Rng.double(0.30, 0.70))
+        Aura.LegitSpot.CHEST -> Vec3(Rng.double(0.42, 0.58), Rng.double(0.62, 0.73), Rng.double(0.42, 0.58))
+        Aura.LegitSpot.HEAD -> Vec3(Rng.double(0.42, 0.58), Rng.double(0.80, 0.90), Rng.double(0.42, 0.58))
+    }
 }

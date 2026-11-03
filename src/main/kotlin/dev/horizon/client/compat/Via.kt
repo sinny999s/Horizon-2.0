@@ -1,7 +1,9 @@
 package dev.horizon.client.compat
 
 import net.fabricmc.loader.api.FabricLoader
+import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ServerData
+import net.minecraft.network.Connection
 import java.lang.reflect.Method
 
 /**
@@ -16,6 +18,7 @@ object Via {
     private var broken = false
     private var translation: Any? = null
     private lateinit var target: Method
+    private var connTarget: Method? = null
     private lateinit var setTarget: Method
     private lateinit var serverVersion: Method
     private lateinit var setServerVersion: Method
@@ -23,6 +26,8 @@ object Via {
     private lateinit var name: Method
     private lateinit var protocol: Method
     private lateinit var known: Method
+    private var olderOrEqual: Method? = null
+    private var v1_8: Any? = null
     private var versionType: Method? = null
 
     /** "Auto detect": the version is found by pinging the server first. */
@@ -44,6 +49,7 @@ object Via {
             val pv = Class.forName("com.viaversion.viaversion.api.protocol.version.ProtocolVersion", true, loader)
             autoDetect = pt.getField("AUTO_DETECT_VERSION").get(null)
             target = pt.getMethod("targetVersion")
+            connTarget = runCatching { pt.getMethod("targetVersion", Connection::class.java) }.getOrNull()
             setTarget = pt.getMethod("setTargetVersion", pv)
             serverVersion = pt.getMethod("serverVersion", ServerData::class.java)
             setServerVersion = pt.getMethod("setServerVersion", ServerData::class.java, pv)
@@ -51,6 +57,8 @@ object Via {
             name = pv.getMethod("getName")
             protocol = pv.getMethod("getVersion")
             known = pv.getMethod("isKnown")
+            olderOrEqual = runCatching { pv.getMethod("olderThanOrEqualTo", pv) }.getOrNull()
+            v1_8 = runCatching { pv.getField("v1_8").get(null) }.getOrNull()
             // (Without it every version counts as a release.)
             versionType = runCatching { pv.getMethod("getVersionType") }.getOrNull()
             ready = translation != null
@@ -105,4 +113,28 @@ object Via {
 
     /** ViaVersion's kind of version (RELEASE, RELEASE_INITIAL, BETA_..., ALPHA_..., CLASSIC, SPECIAL). */
     fun type(version: Any): String = versionType?.let { call(it, version)?.toString() } ?: "RELEASE"
+
+    /** The active connection's protocol version while online, else the chosen join target (null when Auto detect). */
+    fun activeVersion(): Any? {
+        if (!present) return null
+        val conn = Minecraft.getInstance().connection?.connection
+        val ct = connTarget
+        if (conn != null && ct != null) {
+            val v = call(ct, translation, conn)
+            if (v != null && v !== autoDetect) return v
+        }
+        val t = target()
+        return if (t !== autoDetect) t else null
+    }
+
+    /** Connected (or set to join) on 1.8.x or older, before 1.9's attack cooldown. */
+    fun isLegacyCombat(): Boolean {
+        if (!present) return false
+        val v = activeVersion() ?: return false
+        val ref = v1_8
+        val cmp = olderOrEqual
+        if (ref != null && cmp != null) return call(cmp, v, ref) == true
+        val p = protocol(v)
+        return p in 0..47 && type(v) != "SPECIAL"
+    }
 }

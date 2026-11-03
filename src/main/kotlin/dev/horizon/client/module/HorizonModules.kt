@@ -84,13 +84,20 @@ import dev.horizon.client.module.esp.Tracers
 import dev.horizon.client.module.esp.TunnelEsp
 import dev.horizon.client.module.esp.VoidEsp
 import dev.horizon.client.module.esp.XRay
+import dev.horizon.client.module.legit.AimAssist
 import dev.horizon.client.module.legit.AnchorBind
 import dev.horizon.client.module.legit.AutoBuff
+import dev.horizon.client.module.legit.AutoClicker
 import dev.horizon.client.module.legit.BowMinecart
 import dev.horizon.client.module.legit.BowSpam
 import dev.horizon.client.module.legit.CrystalBind
+import dev.horizon.client.module.legit.Eagle
+import dev.horizon.client.module.legit.JumpReset
 import dev.horizon.client.module.legit.LegitTotem
 import dev.horizon.client.module.legit.Reach
+import dev.horizon.client.module.legit.Teams
+import dev.horizon.client.module.legit.TriggerBot
+import dev.horizon.client.module.legit.WTap
 import dev.horizon.client.module.misc.AntiResourcePack
 import dev.horizon.client.module.misc.Announce
 import dev.horizon.client.module.misc.AutoEat
@@ -398,5 +405,12 @@ object HorizonModules {
         Modules.register(EntityControl())
         Modules.register(Ambience())
         Modules.register(ArmorAlert())
+        Modules.register(Eagle())
+        Modules.register(Teams())
+        Modules.register(JumpReset())
+        Modules.register(AutoClicker())
+        Modules.register(AimAssist())
+        Modules.register(TriggerBot())
+        Modules.register(WTap())
     }
 }

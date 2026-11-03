@@ -63,20 +63,82 @@ interface AuraHook {
     fun post(rotation: Rotation) {}
 }
 
-/** The original's `sm` (`while-shielding`): lower a raised shield for the hit; UNPRESS raises it again straight after. */
+/**
+ * The original's `sm` (`while-shielding`): lower a raised shield or 1.8 sword block for the hit; UNPRESS raises it again
+ * straight after. Extended with 1.8 sword `auto-block` (`BLOCK_HIT` / `HOLD`).
+ */
 class ShieldHook(private val aura: Aura) : AuraHook {
     private var blocking = false
+    private var blockingHand = InteractionHand.OFF_HAND
+    var autoBlocking = false
+        private set
+    private var blockHoldTicks = 0
+    private var blockHitCounter = 0
+
+    private fun canSwordBlock(p: Player): Boolean {
+        if (!aura.isLegacyCombat()) return false
+        val s = p.mainHandItem
+        return s.`is`(ItemTags.SWORDS) && (s.useAnimation == ItemUseAnimation.BLOCK ||
+            s.get(DataComponents.BLOCKS_ATTACKS) != null || s.get(DataComponents.CONSUMABLE) != null)
+    }
+
+    fun releaseAutoBlock() {
+        if (!autoBlocking) return
+        autoBlocking = false
+        blockHoldTicks = 0
+        val p = mc.player ?: return
+        if (p.isUsingItem && !PlayerState.physical(mc.options.keyUse)) mc.gameMode?.releaseUsingItem(p)
+    }
+
+    override fun tick() {
+        val p = mc.player ?: return
+        val ab = aura.autoBlock.value
+        if (!aura.isLegacyCombat() || ab == Aura.AutoBlock.OFF || aura.target == null || !canSwordBlock(p)) {
+            releaseAutoBlock()
+            return
+        }
+        if (ab == Aura.AutoBlock.BLOCK_HIT && autoBlocking) {
+            blockHoldTicks--
+            if (blockHoldTicks <= 0) releaseAutoBlock()
+        }
+    }
 
     override fun pre() {
         val p = mc.player ?: return
-        blocking = p.isUsingItem && p.useItem.useAnimation == ItemUseAnimation.BLOCK
+        if (autoBlocking) {
+            releaseAutoBlock()
+            blocking = false
+            return
+        }
+        blocking = p.isUsingItem && (p.useItem.useAnimation == ItemUseAnimation.BLOCK || p.useItem.get(DataComponents.BLOCKS_ATTACKS) != null)
+        blockingHand = p.usedItemHand
         val mode = aura.whileShielding.value
         if (blocking && (mode == Aura.WhileShielding.UNPRESS || mode == Aura.WhileShielding.LEGIT)) mc.gameMode?.releaseUsingItem(p)
     }
 
     override fun post(rotation: Rotation) {
         val p = mc.player ?: return
-        if (blocking && aura.whileShielding.value == Aura.WhileShielding.UNPRESS) mc.gameMode?.useItem(p, InteractionHand.OFF_HAND)
+        if (blocking && aura.whileShielding.value == Aura.WhileShielding.UNPRESS) {
+            mc.gameMode?.useItem(p, blockingHand)
+            return
+        }
+        if (!canSwordBlock(p)) return
+        when (aura.autoBlock.value) {
+            Aura.AutoBlock.OFF -> {}
+            Aura.AutoBlock.HOLD -> {
+                mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
+                autoBlocking = true
+            }
+            Aura.AutoBlock.BLOCK_HIT -> {
+                blockHitCounter++
+                if (blockHitCounter >= 2) {
+                    blockHitCounter = 0
+                    mc.gameMode?.useItem(p, InteractionHand.MAIN_HAND)
+                    autoBlocking = true
+                    blockHoldTicks = 1 + ((System.nanoTime() ushr 4) and 1L).toInt()
+                }
+            }
+        }
     }
 }
 
@@ -162,7 +224,7 @@ class OffhandSwapHook(private val aura: Aura) : AuraHook {
 
     /** The original's `uu.U`: line up the swap in (end of this tick) and the swap back (after the hit). */
     fun schedule() {
-        if (!aura.offhandHitSwap.value) return
+        if (aura.isLegacyCombat() || !aura.offhandHitSwap.value) return
         val slot = find()
         if (slot == -1 || mc.gui.screen() is net.minecraft.client.gui.screens.inventory.ShulkerBoxScreen) return
         val notContainer = mc.gui.screen() !is net.minecraft.client.gui.screens.inventory.ContainerScreen

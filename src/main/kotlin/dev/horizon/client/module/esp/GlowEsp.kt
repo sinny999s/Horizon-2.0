@@ -4,6 +4,7 @@ import dev.horizon.client.config.Friends
 import dev.horizon.client.event.GlowEvent
 import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Module
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.setting.GroupMode
 import net.minecraft.world.entity.Entity
 import net.minecraft.world.entity.Mob
@@ -28,8 +29,11 @@ class GlowEsp : Module("glow-esp", Categories.ESP) {
     val items = bool("items", false, parent = targets.value)
     val other = bool("other", false, parent = targets.value)
     val range = int("range", 128, 8..512)
+    val ignoreTeammates = bool("ignore-teammates", false) { players.value }
+    val useServerTeamColor = bool("use-server-team-color", false) { players.value }
     val playerColor = color("player-color", Color(0xFFFFFFFF.toInt(), true)) { players.value }
     val friendColor = color("friend-color", Color(0xFF55FFFF.toInt(), true)) { players.value }
+    val teamColor = color("team-color", Color(0xFF55FF55.toInt(), true)) { players.value && !ignoreTeammates.value }
     val hostileColor = color("hostile-color", Color(0xFFFF5555.toInt(), true)) { hostile.value }
     val neutralColor = color("neutral-color", Color(0xFFFFAA00.toInt(), true)) { neutral.value }
     val passiveColor = color("passive-color", Color(0xFF55FF55.toInt(), true)) { passive.value }
@@ -49,12 +53,23 @@ class GlowEsp : Module("glow-esp", Categories.ESP) {
         val self = mc.player ?: return null
         if (entity === self || entity.distanceToSqr(self) > range.value.toDouble() * range.value) return null
         return when (entity) {
-            is Player -> if (!players.value) null else if (Friends.isFriend(entity.name.string)) friendColor.value else playerColor.value
+            is Player -> playerGlow(entity)
             is ItemEntity -> itemColor.value.takeIf { items.value }
             is NeutralMob -> neutralColor.value.takeIf { neutral.value }
             is Enemy -> hostileColor.value.takeIf { hostile.value }
             is Mob -> passiveColor.value.takeIf { passive.value }
             else -> otherColor.value.takeIf { other.value }
         }
+    }
+
+    private fun playerGlow(player: Player): Color? {
+        if (!players.value) return null
+        if (Friends.isFriend(player.name.string)) return friendColor.value
+        val teammate = Teams.isTeammate(player)
+        if (teammate && ignoreTeammates.value) return null
+        if (useServerTeamColor.value) {
+            Teams.resolveColor(player)?.let { return Color(it) }
+        }
+        return if (teammate) teamColor.value else playerColor.value
     }
 }

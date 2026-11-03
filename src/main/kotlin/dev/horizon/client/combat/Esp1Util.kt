@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.math.Axis
 import dev.horizon.client.config.Friends
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.event.EventBus
 import dev.horizon.client.event.PlayerUpdateEvent
 import dev.horizon.client.module.Modules
@@ -385,7 +386,7 @@ object PlayerShapes {
             Math.hypot(cam.x - e.x, cam.z - e.z) < maxH && Math.abs(cam.y - e.y) < maxV
         }
         if (players.isEmpty()) return
-        val friend = players.map { Friends.isFriend(it.gameProfile.name()) }
+        val friend = players.map { Friends.isFriend(it.gameProfile.name()) || Teams.isEspAlly(it) }
         draw(mode, players.mapIndexed { i, p -> p to if (friend[i]) friendFill else fill },
             players.mapIndexed { i, p -> p to if (friend[i]) friendLine else line }, World3D.partialTick)
     }

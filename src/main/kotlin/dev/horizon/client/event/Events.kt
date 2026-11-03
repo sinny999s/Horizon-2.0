@@ -99,7 +99,16 @@ class FireworkVectorEvent(var vector: Vec3) : Event()
 class UseItemEvent(val pre: Boolean) : Event()
 
 /** Not in the original: every frame, just after vanilla turned the camera by the mouse (Aura's Legit rotation turns it too). */
-object MouseTurnEvent : Event()
+object MouseTurnEvent : Event() {
+    /** Timestamp (`System.nanoTime()`) of the last non-zero physical mouse delta in `MouseHandler`. */
+    @Volatile
+    var lastPhysicalMoveNs: Long = 0L
+
+    fun movedWithinMs(ms: Long): Boolean {
+        val t = lastPhysicalMoveNs
+        return t != 0L && (System.nanoTime() - t) <= ms * 1_000_000L
+    }
+}
 
 /** The local player's model about to be drawn: head yaw (relative to the body), pitch and body yaw, all settable. */
 class LookRenderEvent(var yaw: Float, var pitch: Float, var bodyYaw: Float) : Event()

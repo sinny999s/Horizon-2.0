@@ -1,6 +1,7 @@
 package dev.horizon.client.combat
 
 import dev.horizon.client.config.Friends
+import dev.horizon.client.module.legit.Teams
 import net.minecraft.client.Minecraft
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.player.Player
@@ -20,7 +21,7 @@ object TargetFinder {
         val self = mc.player ?: return null
         val level = mc.level ?: return null
         val list = level.players().filter { p ->
-            !p.isDeadOrDying && !Friends.isFriend(p.gameProfile.name) && p !== self && self.distanceTo(p) < range &&
+            !p.isDeadOrDying && !Friends.isFriend(p.gameProfile.name) && !Teams.isTeammate(p) && p !== self && self.distanceTo(p) < range &&
                 !(ignoreNaked && p.armorValue <= 0) && !(ignoreCreative && p.isCreative)
         }.sortedBy { self.distanceTo(it) }
         return when (sort) {

@@ -11,6 +11,7 @@ import dev.horizon.client.gui.Fps
 import dev.horizon.client.hud.widgets.Skins
 import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Module
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.render.Animation
 import dev.horizon.client.render.Easing
 import dev.horizon.client.render.Pipelines
@@ -54,8 +55,8 @@ class Tracers : Module("tracers", Categories.ESP) {
     }
 
     private fun colorOf(p: Player, gradientOffset: Int): Int {
-        var c = if (Friends.isFriend(p.gameProfile.name)) friend.value.rgb else Theme.gradient(gradientOffset)
-        if (p.team != null && teamColors.value) c = Color(p.teamColor).rgb
+        var c = if (Friends.isFriend(p.gameProfile.name) || Teams.isEspAlly(p)) friend.value.rgb else Theme.gradient(gradientOffset)
+        if (teamColors.value) Teams.resolveColor(p)?.let { c = Color(it).rgb }
         return c
     }
 

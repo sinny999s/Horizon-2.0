@@ -1,0 +1,87 @@
+# Eagle (FastBridge) + Aura 1.8 Legacy Clicker & Tunable Legit Rotations test.
+# Setup (run via bash/sh so JSON quotes in bind=... are preserved; criticals=false avoids 26.3 extra-position-packet kick):
+#   sh -c 'python tools/testcfg.py setup UI '\''bind={"key":12,"hold":false,"mouse":false}'\'' -- criticals enabled=false -- eagle enabled=false '\''bind={"key":14,"hold":false,"mouse":false}'\'' -- aura enabled=false '\''bind={"key":13,"hold":false,"mouse":false}'\'' rotation-mode=LEGIT combat-mode=LEGACY min-cps=12 max-cps=15 reaction-min=15 reaction-max=35 min-aim-speed=320 max-aim-speed=480 only-angry-hostiles=false'
+title 40
+world
+wait 40
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2014.5 -60.0 2000.5 90 75
+wait 60
+
+# 1. Eagle positive test across chunk border (x=2015 -> x=2016): walk backwards 60 full ticks into cliff & catch edge.
+cmd fill 2014 -57 2000 2015 -57 2000 minecraft:stone
+cmd item replace entity @s weapon.mainhand with minecraft:cobblestone 64
+cmd gamemode survival
+cmd tp @s 2014.5 -56.0 2000.5 90 75
+wait 15
+key K
+key F5
+wait 5
+hold keyDown 60
+wait 65
+shot eagle-edge-caught
+wait 5
+cmd execute if entity @s[x=2015.6,y=-56.2,z=1999.8,dx=0.8,dy=0.6,dz=1.4]
+
+# 2. Block lands underneath across chunk border (x=2016): Eagle releases after hold delay & catches next edge at 2017.
+cmd setblock 2016 -57 2000 minecraft:cobblestone
+wait 10
+hold keyDown 45
+wait 50
+shot eagle-stepped-across-border
+wait 5
+cmd execute if entity @s[x=2016.6,y=-56.2,z=1999.8,dx=0.8,dy=0.6,dz=1.4]
+
+# 3. Negative edge case: holding a sword with blocks-only=true must NOT force sneak at ledge (walks off to y=-60).
+cmd setblock 2015 -57 2005 minecraft:stone
+cmd item replace entity @s weapon.mainhand with minecraft:stone_sword
+cmd tp @s 2015.5 -56.0 2005.5 90 75
+wait 10
+hold keyDown 35
+wait 45
+cmd execute if entity @s[y=-60.2,dy=0.6]
+key K
+key F5
+key F5
+wait 10
+
+# 4. Aura with rotation-mode=LEGIT and combat-mode=LEGACY: turns real camera onto target & spam-clicks to kill.
+cmd tp @s 2000.5 -60.0 2000.5 0 0
+wait 15
+cmd summon minecraft:husk 2002.0 -60.0 2002.2 {NoAI:1b,Silent:1b,Health:10.0f}
+wait 5
+cmd execute if entity @e[type=minecraft:husk,distance=..6]
+key J
+wait 14
+shot aura-legit-18-tracking
+cmd execute if entity @s[y_rotation=-58..-20]
+wait 65
+cmd execute unless entity @e[type=minecraft:husk,nbt={DeathTime:0s},distance=..8]
+key J
+cmd kill @e[type=!player]
+wait 10
+
+# 5. ClickGUI verification: Eagle inspector, Aura Legit rotation group, and Aura 1.8 Clicker settings.
+key I
+wait 25
+type eagle
+wait 10
+key RETURN
+wait 20
+shot gui-eagle
+type aim spot
+wait 10
+key RETURN
+wait 20
+shot gui-aura-legit-group
+type click pattern
+wait 10
+key RETURN
+wait 20
+shot gui-aura-18-clicker
+key ESCAPE
+wait 10
+quit

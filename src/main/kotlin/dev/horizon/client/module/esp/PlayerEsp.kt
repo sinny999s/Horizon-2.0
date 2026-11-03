@@ -18,6 +18,7 @@ import dev.horizon.client.module.Module
 import dev.horizon.client.module.Modules
 import dev.horizon.client.module.RenderMode
 import dev.horizon.client.module.ShaderMode
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.module.world.FreeCam
 import dev.horizon.client.render.Chams
 import dev.horizon.client.render.Pipelines
@@ -113,7 +114,7 @@ class PlayerEsp : Module("player-esp", Categories.ESP) {
 
     private fun mirrorHides() = shader.value && shaderMode.value == ShaderMode.MIRROR && !mask.active
 
-    private fun friend(p: Player) = Friends.isFriend(p.gameProfile.name())
+    private fun friend(p: Player) = Friends.isFriend(p.gameProfile.name()) || Teams.isEspAlly(p)
 
     /** The players `oj.t` draws: within the distances of the camera entity, yourself only in third person. */
     private fun inRange(): List<Player> {

@@ -1,0 +1,178 @@
+# Teams (multi-server) + Core Ghost Pack (JumpReset, AutoClicker, AimAssist, TriggerBot, WTap) verification.
+# Setup:
+#   sh -c 'python tools/testcfg.py setup UI '\''bind={"key":12,"hold":false,"mouse":false}'\'' -- criticals enabled=false -- teams enabled=true -- glow-esp enabled=true players=true player-color=-43691 -- aura enabled=false rotation-mode=LEGIT combat-mode=LEGACY min-cps=12 max-cps=15 reaction-min=10 reaction-max=25 min-aim-speed=340 max-aim-speed=480 only-angry-hostiles=false -- aim-assist enabled=false players-only=false weapon-only=true require-click=true horizontal-speed=320 vertical-speed=140 smoothness=0.35 -- trigger-bot enabled=false combat-mode=AUTO reaction-min=10 reaction-max=25 -- w-tap enabled=false chance=100 only-while-sprinting=false -- auto-clicker enabled=false left=true right=true min-cps=14 max-cps=18 right-min-cps=14 right-max-cps=18 -- jump-reset enabled=false chance=100'
+title 40
+world
+wait 40
+cmd gamerule spawn_mobs false
+cmd gamerule advance_time false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 2000.5 -60.0 2000.5 20 0
+wait 60
+
+# 1. Teams + GlowEsp + Aura: per-player scoreboard teams sharing RED colour vs enemy BLUE team.
+cmd team add red_self
+cmd team modify red_self color red
+cmd team add red_ally
+cmd team modify red_ally color red
+cmd team add blue_foe
+cmd team modify blue_foe color blue
+cmd team join red_self @s
+fakeplayer RedMate 2000.5 -60.0 2002.4 180
+fakeplayer BlueEnemy 1998.7 -60.0 2002.4 180
+cmd team join red_ally RedMate
+cmd team join blue_foe BlueEnemy
+cmd item replace entity @s weapon.mainhand with minecraft:stone_sword
+wait 15
+shot teams-glow-esp
+
+# Face RedMate directly (0 deg, 1.9m away). Aura must skip RedMate and rotate onto BlueEnemy (+45 deg, 2.6m away).
+cmd tp @s 2000.5 -60.0 2000.5 0 0
+wait 10
+toggle aura on
+wait 22
+shot teams-aura-skips-mate
+cmd execute if entity @s[y_rotation=25..65]
+toggle aura off
+wait 10
+
+# 2. AimAssist: negative check without click (stays at 0 deg), then smooth camera tracking while LMB is held.
+cmd tp @s 2025.5 -60.0 2000.5 0 0
+wait 20
+cmd summon minecraft:husk 2027.0 -60.0 2002.2 {NoAI:1b,Silent:1b,Health:20.0f}
+wait 5
+toggle aim-assist on
+wait 15
+cmd execute if entity @s[y_rotation=-3..3]
+hold keyAttack 22
+wait 25
+shot aim-assist-tracking
+cmd execute if entity @s[y_rotation=-58..-18]
+toggle aim-assist off
+cmd kill @e[type=minecraft:husk]
+wait 10
+
+# 3. TriggerBot + WTap: negative check on RedMate (no turn/crash), positive spam-click kill on Husk under crosshair.
+cmd tp @s 2000.5 -60.0 2000.5 0 0
+wait 10
+toggle trigger-bot on
+wait 12
+cmd execute if entity @s[y_rotation=-2..2]
+toggle trigger-bot off
+
+cmd tp @s 2045.5 -60.0 1999.8 0 0
+wait 15
+cmd setblock 2045 -60 2001 minecraft:oak_fence
+cmd summon minecraft:husk 2045.5 -60.0 2002.4 {NoAI:1b,Silent:1b,Health:10.0f}
+wait 5
+toggle w-tap on
+toggle trigger-bot on
+hold keyUp 45
+wait 65
+cmd execute unless entity @e[type=minecraft:husk,nbt={DeathTime:0s},distance=..8]
+toggle trigger-bot off
+toggle w-tap off
+cmd kill @e[type=minecraft:husk]
+wait 10
+
+# 4. AutoClicker: Left-clicker kills Husk on held LMB; Right-clicker + Eagle fast-bridges cobblestone across ledge.
+cmd tp @s 2065.5 -60.0 2000.5 0 0
+wait 15
+cmd summon minecraft:husk 2065.5 -60.0 2002.3 {NoAI:1b,Silent:1b,Health:8.0f}
+wait 5
+toggle auto-clicker on
+hold keyAttack 45
+wait 50
+cmd execute unless entity @e[type=minecraft:husk,nbt={DeathTime:0s},distance=..8]
+cmd kill @e[type=minecraft:husk]
+
+cmd fill 2079 -57 2000 2080 -57 2000 minecraft:stone
+cmd item replace entity @s weapon.mainhand with minecraft:cobblestone 64
+cmd gamemode survival
+cmd tp @s 2080.3 -56.0 2000.5 90 82.5
+wait 12
+toggle eagle on
+key F5
+hold keyDown 32
+hold keyUse 32
+wait 38
+shot eagle-autoclicker-bridge
+cmd execute if block 2081 -57 2000 minecraft:cobblestone
+toggle eagle off
+toggle auto-clicker off
+key F5
+key F5
+wait 10
+
+# 5. JumpReset: ignores non-knockback fire damage, cuts backward knockback vs baseline when sprinting into an attacker.
+toggle jump-reset on
+cmd tp @s 2100.5 -60.0 2000.5 0 8
+wait 15
+hold keyUp 14
+wait 5
+cmd damage @s 1 minecraft:on_fire
+wait 4
+cmd execute at @s positioned ~ -58.8 ~ unless entity @s[distance=..1.0]
+toggle jump-reset off
+wait 20
+
+cmd summon minecraft:husk 2100.5 -60.0 2005.5 {NoAI:1b,Silent:1b,Health:20.0f}
+cmd tp @s 2100.5 -60.0 2000.5 0 8
+wait 22
+hold keyUp 18
+wait 6
+cmd damage @s 1 minecraft:mob_attack by @n[type=minecraft:husk]
+wait 15
+cmd execute positioned 2100.5 -60.0 2005.5 if entity @s[distance=2.85..4.8]
+
+toggle jump-reset on
+cmd tp @s 2100.5 -60.0 2000.5 0 8
+wait 22
+hold keyUp 18
+wait 6
+cmd damage @s 1 minecraft:mob_attack by @n[type=minecraft:husk]
+wait 4
+shot jump-reset-action
+wait 11
+cmd execute positioned 2100.5 -60.0 2005.5 if entity @s[distance=..2.75]
+toggle jump-reset off
+cmd kill @e[type=minecraft:husk]
+wait 10
+
+# 6. ClickGUI verification for Teams and all 5 Ghost Pack modules.
+key I
+wait 25
+type teams
+wait 10
+key RETURN
+wait 20
+shot gui-legit-teams
+type jump reset
+wait 10
+key RETURN
+wait 20
+shot gui-jump-reset
+type auto clicker
+wait 10
+key RETURN
+wait 20
+shot gui-auto-clicker
+type aim assist
+wait 10
+key RETURN
+wait 20
+shot gui-aim-assist
+type trigger bot
+wait 10
+key RETURN
+wait 20
+shot gui-trigger-bot
+type w tap
+wait 10
+key RETURN
+wait 20
+shot gui-wtap
+key ESCAPE
+wait 10
+quit

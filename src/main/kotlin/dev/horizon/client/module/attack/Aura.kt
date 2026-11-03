@@ -8,12 +8,13 @@ import dev.horizon.client.combat.Rotation
 import dev.horizon.client.combat.RotationManager
 import dev.horizon.client.combat.Swings
 import dev.horizon.client.combat.moduleMessage
+import dev.horizon.client.compat.Via
 import dev.horizon.client.event.CrosshairEvent
+import dev.horizon.client.event.MouseTurnEvent
 import dev.horizon.client.event.PlayerUpdateEvent
 import dev.horizon.client.event.PostTasksEvent
 import dev.horizon.client.event.PostTickEvent
 import dev.horizon.client.event.ReceivePacketEvent
-import dev.horizon.client.event.MouseTurnEvent
 import dev.horizon.client.event.Render3DEvent
 import dev.horizon.client.event.SprintEvent
 import dev.horizon.client.hud.NotificationType
@@ -22,13 +23,13 @@ import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Esp
 import dev.horizon.client.module.Module
 import dev.horizon.client.module.Modules
+import dev.horizon.client.module.basic.Sprint as SprintModule
 import dev.horizon.client.module.rage.Blink
 import dev.horizon.client.module.rage.ElytraTarget
 import dev.horizon.client.module.rage.MaceElytraTarget
 import dev.horizon.client.render.WorldEsp
 import dev.horizon.client.setting.GroupMode
 import dev.horizon.client.setting.ValueLabels
-import dev.horizon.client.module.basic.Sprint as SprintModule
 import net.minecraft.core.component.DataComponents
 import net.minecraft.network.protocol.game.ClientboundEntityEventPacket
 import net.minecraft.tags.ItemTags
@@ -36,13 +37,16 @@ import net.minecraft.util.Mth
 import net.minecraft.util.profiling.Profiler
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.entity.Entity
-import net.minecraft.world.entity.LivingEntity
 import net.minecraft.world.entity.player.Player
+import net.minecraft.world.item.ItemUseAnimation
 import kotlin.random.Random
 
 /**
  * The original's "aura" (`jv`): every tick picks a target, turns towards it with the chosen rotation mode, and hits it when
  * the attack timer, sprint handling and the ray (or line of sight) allow.
+ *
+ * Extended with ViaFabricPlus 1.8.x auto-detection ([combatMode]), millisecond-paced humanized 1.8 clicking, 1.8
+ * swing-before-attack packet order, and tunable [LegitRotation] mouse-spring parameters.
  */
 class Aura : Module("aura", Categories.ATTACK) {
     enum class Point { CENTER, EYES, CLOSEST, ROAMING, RUST }
@@ -52,6 +56,9 @@ class Aura : Module("aura", Categories.ATTACK) {
     enum class HoldTiming { BEFORE_RANDOM, AFTER_RANDOM }
     enum class FilterLowDeltas { REMOVE, REPLACE, OFF }
     enum class RotationMode { SNAP, DEFAULT, NONE, VULCAN, HVH, POLAR_SEP_25, GRIM_SILENT, ADVANCED, CUSTOM, LEGIT }
+    enum class LegitSpot { WANDER, CLOSEST, CHEST, HEAD }
+    enum class CombatMode { AUTO, COOLDOWN, LEGACY }
+    enum class AutoBlock { OFF, BLOCK_HIT, HOLD }
     enum class AutoWeapon { NORMAL, NONE, SILENT }
     enum class WhileShielding { PAUSE, IGNORE, UNPRESS, LEGIT }
     enum class RandomizeDelay { OFF, VULCAN, DEFAULT, LEGIT }
@@ -126,13 +133,27 @@ class Aura : Module("aura", Categories.ATTACK) {
     val replaceMax = float("replace-max", 5.0f, 0.0f..45.0f, parent = advanced.value) { filterLowDeltas.value == FilterLowDeltas.REPLACE && rotationMode.value == RotationMode.ADVANCED }
     val rotationMode = enum("rotation-mode", RotationMode.DEFAULT)
     val priorityManual = bool("priority-manual", true) { rotationMode.value == RotationMode.SNAP }
+    val legit = group("legit") { rotationMode.value == RotationMode.LEGIT }.also { it.value.opened = true }
+    val aimSpot = enum("aim-spot", LegitSpot.WANDER, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val minAimSpeed = float("min-aim-speed", 240.0f, 20.0f..720.0f, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val maxAimSpeed = float("max-aim-speed", 420.0f, 20.0f..720.0f, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val smoothness = float("smoothness", 0.45f, 0.05f..1.0f, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val pitchAssist = int("pitch-assist", 65, 0..100, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val hitboxRelax = int("hitbox-relax", 70, 0..100, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val reactionMin = int("reaction-min", 35, 0..300, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val reactionMax = int("reaction-max", 85, 0..300, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val tremor = float("tremor", 0.35f, 0.0f..2.0f, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
+    val requireClick = bool("require-click", false, parent = legit.value) { rotationMode.value == RotationMode.LEGIT }
     val autoWeapon = enum("auto-weapon", AutoWeapon.NONE)
     val onlyWeapon = bool("only-weapon", false)
-    val oldDelay = bool("old-delay", false)
-    val minCps = int("min-cps", 9, 1..20) { oldDelay.value }
-    val maxCps = int("max-cps", 11, 1..20) { oldDelay.value }
-    val shieldBreaker = bool("shield-breaker", true)
-    val splashWhileOnGround = bool("splash-while-on-ground", false)
+    val combatMode = enum("combat-mode", CombatMode.AUTO)
+    val minCps = int("min-cps", 10, 1..20) { isLegacyCombat() }
+    val maxCps = int("max-cps", 14, 1..20) { isLegacyCombat() }
+    val clickPattern = enum("click-pattern", LegacyClicker.Pattern.HUMAN) { isLegacyCombat() }
+    val swingRange = float("swing-range", 0.5f, 0.0f..2.5f) { isLegacyCombat() }
+    val autoBlock = enum("auto-block", AutoBlock.OFF) { isLegacyCombat() }
+    val shieldBreaker = bool("shield-breaker", true) { !isLegacyCombat() }
+    val splashWhileOnGround = bool("splash-while-on-ground", false) { !isLegacyCombat() }
     val backTrack = bool("back-track", false)
     val moveDelay = int("move-delay", 250, 0..1000) { backTrack.value }
     val attackChance = int("attack-chance", 100, 50..100)
@@ -142,8 +163,8 @@ class Aura : Module("aura", Categories.ATTACK) {
     val disableOnDeath = bool("disable-on-death", true)
     val overrideCrosshair = bool("override-crosshair", true)
     val rotateOnDisable = bool("rotate-on-disable", false)
-    val offhandHitSwap = bool("offhand-hit-swap", false)
-    val randomizeDelay = enum("randomize-delay", RandomizeDelay.OFF)
+    val offhandHitSwap = bool("offhand-hit-swap", false) { !isLegacyCombat() }
+    val randomizeDelay = enum("randomize-delay", RandomizeDelay.OFF) { !isLegacyCombat() }
     val sprint = enum("sprint", Sprint.NORMAL)
     val esp = enum("esp", Esp.COMETS)
     val sort = enum("sort", Sort.Distance)
@@ -161,6 +182,13 @@ class Aura : Module("aura", Categories.ATTACK) {
     val ignoreTeam = bool("ignore-team", false, parent = targets.value)
     val ignoreCreative = bool("ignore-creative", true, parent = targets.value)
     val ignoreNaked = bool("ignore-naked", false, parent = targets.value)
+
+    /** 1.8.x spam-click combat is active (auto-detected through ViaFabricPlus, or forced to [CombatMode.LEGACY]). */
+    fun isLegacyCombat(): Boolean = when (combatMode.value) {
+        CombatMode.AUTO -> Via.isLegacyCombat()
+        CombatMode.LEGACY -> true
+        CombatMode.COOLDOWN -> false
+    }
 
     /** The entity Aura is fighting (the original's `G`). */
     @Volatile
@@ -221,6 +249,9 @@ class Aura : Module("aura", Categories.ATTACK) {
     private fun reset() {
         target = null
         backTracker.flush()
+        timer.reset()
+        shield.releaseAutoBlock()
+        LegitRotation.reset()
         val p = mc.player ?: return
         rotation = Rotation(p.yRot, p.xRot)
         sprintHook.resetting = false
@@ -239,10 +270,11 @@ class Aura : Module("aura", Categories.ATTACK) {
     /** The original's `jv.Ps`. */
     private fun shouldPause(): Boolean {
         val p = mc.player ?: return true
+        if (effectiveRotation() === LegitRotation && requireClick.value && !PlayerState.physical(mc.options.keyAttack)) return true
         if (PlayerState.containerOpen && pauseInInventory.value) return true
-        val blocker = p.useItem.get(DataComponents.BLOCKS_ATTACKS) != null
+        val blocker = p.useItem.get(DataComponents.BLOCKS_ATTACKS) != null || p.useItem.useAnimation == ItemUseAnimation.BLOCK
         if (p.isUsingItem && pauseWhileEating.value && !blocker) return true
-        if (p.isUsingItem && whileShielding.value == WhileShielding.PAUSE && blocker) return true
+        if (p.isUsingItem && !shield.autoBlocking && whileShielding.value == WhileShielding.PAUSE && blocker) return true
         if (!weapon.gate()) return true
         val blink = Modules.get<Blink>()
         return blink.enabled && blink.attackAction.value == Blink.AttackAction.NONE && !Modules.get<ElytraTarget>().enabled
@@ -261,12 +293,12 @@ class Aura : Module("aura", Categories.ATTACK) {
         val p = mc.player ?: return
         if (shouldPause()) {
             target = null
+            shield.releaseAutoBlock()
             lookBack(p)
             for (h in hooks) h.tick()
             return
         }
         if (backTrack.value) backTracker.update()
-        val t = target
         Modules.get<ElytraTarget>().resolve { selectAndAim(p) }
     }
 
@@ -276,6 +308,7 @@ class Aura : Module("aura", Categories.ATTACK) {
         target = t
         for (h in hooks) h.tick()
         if (t == null) {
+            shield.releaseAutoBlock()
             lookBack(p)
             return
         }
@@ -290,46 +323,75 @@ class Aura : Module("aura", Categories.ATTACK) {
             return
         }
         rotation = if (fov.value == 1) Rotation(p.yRot, p.xRot) else mode.rotate(this, t, rotation, attackReady)
+        val inHitRange = PlayerState.eye.distanceTo(mode.aimPoint(this, t)) <= range.value
         val canHit = if (mode.needsRaycast(this)) rayHitsTarget(t, rotation, range.value, !ignoreWalls.value)
-        else p.hasLineOfSight(t) || ignoreWalls.value
+        else inHitRange && (p.hasLineOfSight(t) || ignoreWalls.value)
         RotationManager.queue(InstantRequest(rotation, 130) { onRotated(attackReady, canHit) })
     }
 
     /** Runs when Aura's request wins (PlayerUpdate −20), before the movement packet. */
     private fun onRotated(attackReady: Boolean, canHit: Boolean) {
         rotated = true
-        if (!attackReady || !canHit) return
-        if (breakShield()) return
         val t = target ?: return
+        if (!attackReady) return
+        if (!canHit) {
+            if (isLegacyCombat() && swingRange.value > 0f && inPreSwingRange(t)) preSwing()
+            return
+        }
+        if (!isLegacyCombat() && breakShield()) return
         attack(t, rotation)
     }
 
-    /** The original's `jv.s`. */
+    private fun inPreSwingRange(t: Entity): Boolean {
+        val p = mc.player ?: return false
+        val mode = effectiveRotation()
+        val sight = p.hasLineOfSight(t) || (ignoreWalls.value && mode !== LegitRotation)
+        return sight && PlayerState.eye.distanceTo(mode.aimPoint(this, t)) <= range.value + swingRange.value
+    }
+
+    /** 1.8 pre-swing / miss-swing while approaching or mid-flick, without sending an out-of-range attack packet. */
+    private fun preSwing() {
+        val p = mc.player ?: return
+        shield.pre()
+        p.swing(InteractionHand.MAIN_HAND, p.mainHandItem.attackAnimation, false)
+        Swings.punch()
+        timer.post(rotation)
+        shield.post(rotation)
+        LegitRotation.onSwing()
+    }
+
+    /** The original's `jv.s` (with 1.8.x swing-before-attack packet ordering when [isLegacyCombat] is active). */
     private fun attack(t: Entity, rot: Rotation) {
         val p = mc.player ?: return
         val gm = mc.gameMode ?: return
+        val legacy = isLegacyCombat()
         if (attackChance.value == 100 || Random.nextFloat() * 100 < attackChance.value) {
             for (h in hooks) h.pre()
             val center = Rotation.lookAt(t.boundingBox.center)
             val grim = rotationMode.value == RotationMode.GRIM_SILENT
             if (grim) Packets.sendRotation(center.yaw, center.pitch)
             val stack = p.mainHandItem
-            val piercing = stack.get(DataComponents.PIERCING_WEAPON)
+            if (legacy) p.swing(InteractionHand.MAIN_HAND, stack.attackAnimation, false)
+            val piercing = if (legacy) null else stack.get(DataComponents.PIERCING_WEAPON)
             if (piercing != null && !gm.isSpectator) {
                 gm.piercingAttack(stack.attackAnimation, piercing)
                 Swings.punch()
             } else {
                 gm.attack(p, t)
             }
-            p.swing(InteractionHand.MAIN_HAND, stack.attackAnimation, false)
+            if (!legacy) p.swing(InteractionHand.MAIN_HAND, stack.attackAnimation, false)
             if (grim) Packets.sendRotation(p.yRot, p.xRot)
             for (h in hooks) h.post(rot)
         } else {
+            shield.pre()
             p.swing(InteractionHand.MAIN_HAND, p.mainHandItem.attackAnimation, false)
             Swings.punch()
+            timer.post(rot)
+            shield.post(rot)
         }
         p.resetOnlyAttackStrengthTicker()
         AdvancedRotation.onAttack(this)
+        LegitRotation.onSwing()
     }
 
     /** The original's `jv.PZ`: an axe hit (swapped in through the inventory) on a player holding a shield up. */

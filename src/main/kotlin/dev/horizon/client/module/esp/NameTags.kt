@@ -12,6 +12,7 @@ import dev.horizon.client.hud.ServerInfo
 import dev.horizon.client.mixin.esp1.BaseSpawnerAccessor
 import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Module
+import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.render.Animation
 import dev.horizon.client.render.Canvas
 import dev.horizon.client.render.Easing
@@ -161,7 +162,7 @@ class NameTags : Module("name-tags", Categories.ESP) {
             val top = (v.y - 13.0f).toFloat()
             val over = mouseX >= x - 2 && mouseX <= x - 2 + w + 4 && mouseY >= top && mouseY <= top + 12
             if (over && screen != null) hovered = p.gameProfile.name()
-            (if (Friends.isFriend(p.gameProfile.name())) friendPlates else plates).add(x - 2, top, w + 4, 12.0f, if (over && screen != null) 0.5f else 1.0f)
+            (if (Friends.isFriend(p.gameProfile.name()) || Teams.isEspAlly(p)) friendPlates else plates).add(x - 2, top, w + 4, 12.0f, if (over && screen != null) 0.5f else 1.0f)
             Fonts.bold8.queue(text, x, v.y.toFloat() - 13.0f, -1)
             if (health.value != Health.Number) {
                 pose.pushMatrix()
