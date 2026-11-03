@@ -3,26 +3,21 @@ package dev.horizon.client.module.legit
 import dev.horizon.client.combat.Inventory
 import dev.horizon.client.combat.Movement
 import dev.horizon.client.combat.Placer
-import dev.horizon.client.combat.PlaceBoxes
 import dev.horizon.client.combat.PlayerState
 import dev.horizon.client.combat.Rng
 import dev.horizon.client.combat.Rotation
 import dev.horizon.client.event.KeyboardInputEvent
 import dev.horizon.client.event.MouseTurnEvent
 import dev.horizon.client.event.Render2DEvent
-import dev.horizon.client.event.Render3DEvent
 import dev.horizon.client.event.SendPacketEvent
 import dev.horizon.client.event.TickEvent
 import dev.horizon.client.gui.Keys
-import dev.horizon.client.module.Animation
 import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Module
 import dev.horizon.client.module.Modules
-import dev.horizon.client.module.Render
 import dev.horizon.client.module.basic.GuiMove
 import dev.horizon.client.module.basic.Sprint
 import dev.horizon.client.render.Fonts
-import dev.horizon.client.render.Theme
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
@@ -286,7 +281,6 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                 lastPlaceTick = p.tickCount
                 lastTargetPos = targetPos
                 mc.gameMode?.useItemOn(p, InteractionHand.MAIN_HAND, placement)
-                PlaceBoxes.add(targetPos, Theme.primary or (0xFF shl 24), Theme.primary or (0x44 shl 24), Animation.Fade, Render.BOTH)
 
                 // Only increment block count and check auto-jump for real NEW placed blocks
                 if (isNewBlock) {
@@ -373,11 +367,6 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             }
             font.draw(text, cx - w / 2f, cy, col)
             font.flush()
-        }
-
-        on<Render3DEvent> {
-            val bp = lastTargetPos ?: return@on
-            PlaceBoxes.add(bp, Theme.primary or (0xFF shl 24), Theme.primary or (0x22 shl 24), Animation.Static, Render.BOTH)
         }
     }
 
