@@ -57,7 +57,7 @@ import kotlin.math.sqrt
 class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "scaffold-legit", "fast-bridge-plus")) {
     enum class Mode { LEGIT, GOD_BRIDGE }
     enum class FilterMode { NONE, BLACKLIST, WHITELIST }
-    enum class AngleMode { NONE, SNAP_DIAGONAL, SMOOTH_AIM, HARD_LOCK }
+    enum class AngleMode { NONE, SMOOTH_DIAGONAL, SNAP_DIAGONAL, HARD_LOCK }
 
     val mode = enum("mode", Mode.GOD_BRIDGE)
 
@@ -67,8 +67,8 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     val edgeDistance = float("edge-distance", 0.18f, 0.05f..0.29f) { mode.value == Mode.LEGIT }
 
     // GodBridge mode settings
-    val autoAngle = enum("auto-angle", AngleMode.SMOOTH_AIM) { mode.value == Mode.GOD_BRIDGE }
-    val aimSpeed = float("aim-speed", 300.0f, 60.0f..600.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value == AngleMode.SMOOTH_AIM }
+    val autoAngle = enum("auto-angle", AngleMode.SMOOTH_DIAGONAL) { mode.value == Mode.GOD_BRIDGE }
+    val aimSpeed = float("aim-speed", 300.0f, 60.0f..600.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value == AngleMode.SMOOTH_DIAGONAL }
     val targetPitch = float("target-pitch", 76.5f, 65.0f..85.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value != AngleMode.NONE }
     val activationBlocks = int("activation-blocks", 0, 0..10) { mode.value == Mode.GOD_BRIDGE }
     val placeDelay = int("place-delay", 0, 0..5) { mode.value == Mode.GOD_BRIDGE }
@@ -241,19 +241,15 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         // Smooth aiming on MouseTurnEvent for legit steering
         on<MouseTurnEvent> {
             val p = mc.player ?: return@on
-            if (mode.value != Mode.GOD_BRIDGE || autoAngle.value != AngleMode.SMOOTH_AIM) return@on
-            val placement = currentPlacement ?: return@on
+            if (mode.value != Mode.GOD_BRIDGE || autoAngle.value != AngleMode.SMOOTH_DIAGONAL) return@on
             val now = System.nanoTime()
             val dt = if (lastNs == 0L) 0.0 else ((now - lastNs) / 1e9).coerceIn(0.0, 0.05)
             lastNs = now
 
-            val eye = p.eyePosition
-            val aim = placement.location
-            val dx = aim.x - eye.x
-            val dz = aim.z - eye.z
-            val wantYaw = Math.toDegrees(atan2(dz, dx)) - 90.0
+            // Smoothly align to the nearest 45-degree diagonal angle and target pitch
+            val wantYaw = ((p.yRot / 45f).roundToInt() * 45f).toDouble()
             val wantPitch = targetPitch.value.toDouble()
-            val errYaw = Mth.wrapDegrees(wantYaw - p.yRot)
+            val errYaw = Mth.wrapDegrees((wantYaw - p.yRot).toFloat()).toDouble()
             val errPitch = wantPitch - p.xRot
 
             val maxSpeed = aimSpeed.value.toDouble()
