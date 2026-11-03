@@ -98,6 +98,8 @@ import dev.horizon.client.module.legit.Reach
 import dev.horizon.client.module.legit.Teams
 import dev.horizon.client.module.legit.TriggerBot
 import dev.horizon.client.module.legit.WTap
+import dev.horizon.client.module.legit.BlockIn
+import dev.horizon.client.module.legit.BedDefender
 import dev.horizon.client.module.misc.AntiResourcePack
 import dev.horizon.client.module.misc.Announce
 import dev.horizon.client.module.misc.AutoEat
@@ -412,5 +414,7 @@ object HorizonModules {
         Modules.register(AimAssist())
         Modules.register(TriggerBot())
         Modules.register(WTap())
+        Modules.register(BlockIn())
+        Modules.register(BedDefender())
     }
 }
