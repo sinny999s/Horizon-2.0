@@ -2,6 +2,7 @@ package dev.horizon.client.module
 
 import dev.horizon.client.config.Macros
 import dev.horizon.client.gui.Keys
+import dev.horizon.client.hud.widgets.KeystrokesWidget
 import net.minecraft.client.Minecraft
 
 /**
@@ -17,6 +18,7 @@ object Binds {
 
     fun onMouse(button: Int, action: Int) {
         if (action == PRESS) Keys.heldMouse.add(button) else if (action == RELEASE) Keys.heldMouse.clear()
+        KeystrokesWidget.onPhysicalMouse(button, action)
         onInput(button, action, true)
     }
 

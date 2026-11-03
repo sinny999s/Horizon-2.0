@@ -12,6 +12,7 @@ import dev.horizon.client.hud.widgets.FlightWidget
 import dev.horizon.client.hud.widgets.FpsWidget
 import dev.horizon.client.hud.widgets.InventoryWidget
 import dev.horizon.client.hud.widgets.KeybindsWidget
+import dev.horizon.client.hud.widgets.KeystrokesWidget
 import dev.horizon.client.hud.widgets.MacroWidget
 import dev.horizon.client.hud.widgets.MediaPlayerWidget
 import dev.horizon.client.hud.widgets.NotificationsWidget
@@ -50,6 +51,7 @@ object Hud {
             // Not in the original.
             ArrayListWidget,
             SessionStatsWidget,
+            KeystrokesWidget,
         )
     }
 

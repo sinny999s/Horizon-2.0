@@ -74,7 +74,7 @@ object ModernHudEditor : Screen(Component.literal("horizon-widget-editor")) {
 
     /** hud.js's names: The original lists the ids ("Fps Widget", "Coord Widget"). */
     private val NAMES = mapOf("coord-widget" to "Coords", "fps-widget" to "FPS", "tps-widget" to "TPS", "keybinds-widget" to "Key Binds",
-        "pvp-resources-widget" to "PvP Resources", "array-list-widget" to "ArrayList")
+        "pvp-resources-widget" to "PvP Resources", "array-list-widget" to "ArrayList", "keystrokes-widget" to "Keystrokes")
 
     private val DESC = mapOf(
         "coord-widget" to "Where you are, and in the Nether", "fps-widget" to "Frames per second",
@@ -89,6 +89,8 @@ object ModernHudEditor : Screen(Component.literal("horizon-widget-editor")) {
         "crosshair" to "Spreads as you swing and move", "flight-widget" to "Compass, pitch and stats while gliding",
         "phase-widget" to "Your hitbox in the block you stand in", "cooldowns-widget" to "Items on cooldown, like pearls",
         "macro-widget" to "Your item macros and their keys", "array-list-widget" to "Every enabled module, with its mode",
+        "session-stats-widget" to "Playtime, kills, deaths, K/D and totem pops",
+        "keystrokes-widget" to "WASD, mouse buttons, spacebar and CPS",
     )
 
     /** The widgets without an icon of the original's get one drawn after what they show (assets/horizon/vector/gui). */
