@@ -6,6 +6,7 @@ import dev.horizon.client.module.Categories
 import dev.horizon.client.module.Module
 import dev.horizon.client.module.Modules
 import dev.horizon.client.module.basic.GuiMove
+import dev.horizon.client.module.basic.Sprint
 import net.minecraft.util.Mth
 import net.minecraft.world.entity.player.Input
 import net.minecraft.world.entity.player.Player
@@ -72,6 +73,7 @@ class Eagle : Module("eagle", Categories.LEGIT, listOf("fast-bridge", "bridge-as
             }
 
             if (sneaking && !keys.shift()) {
+                Modules.get<Sprint>().releaseKey()
                 p.input.keyPresses = Input(
                     keys.forward(),
                     keys.backward(),

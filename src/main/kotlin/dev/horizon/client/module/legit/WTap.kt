@@ -115,6 +115,7 @@ class WTap : Module("w-tap", Categories.LEGIT, listOf("s-tap", "sprint-reset", "
             (p.input as ClientInputAccessor).horizon_setMoveVector(Vec2(mv.x, if (sTap) -1.0f else 0.0f))
             p.isSprinting = false
             Modules.get<Sprint>().skipOnce = true
+            Modules.get<Sprint>().releaseKey()
         }
     }
 }
