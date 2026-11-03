@@ -91,8 +91,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     private var lastActiveTick = 0
     private var lastPlacedPos: BlockPos? = null
     /** A use was sent for this position; wait for its local block update before counting it. */
-    private var pendingPlacedPos: BlockPos? = null
-    private var pendingPlacedTick = 0
+    private val pending = ArrayList<Pair<BlockPos, Int>>()
     /** Ticks to wait before the next use, re-rolled after each one like a human's click rhythm. */
     private var nextDelay = 0
     /** Set when a block-interval jump is due; applied to the next input tick as a real jump key press. */
@@ -117,8 +116,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         lastPlaceTick = 0
         lastActiveTick = 0
         lastPlacedPos = null
-        pendingPlacedPos = null
-        pendingPlacedTick = 0
+        pending.clear()
         nextDelay = 0
         jumpRequested = false
         vYaw = 0.0
@@ -262,8 +260,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
 
             // The real thing a right click would do: vanilla startUseItem on the current crosshair target.
             val target = hit.blockPos.relative(hit.direction)
-            pendingPlacedPos = target
-            pendingPlacedTick = p.tickCount
+            pending += target to p.tickCount
             lastPlaceTick = p.tickCount
             nextDelay = placeDelay.value + Rng.int(0, 1)
             (mc as MinecraftAccessor).horizon_startUseItem()
@@ -366,19 +363,30 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
 
     /** Counts a sent use once its block shows up locally, and queues the auto-jump every [jumpInterval] blocks. */
     private fun countPending(p: Player, level: Level) {
-        val target = pendingPlacedPos ?: return
-        if (!level.getBlockState(target).canBeReplaced()) {
-            pendingPlacedPos = null
-            if (target != lastPlacedPos) {
-                lastPlacedPos = target
-                bridgeBlocksPlaced++
-                if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
-                    bridgeBlocksPlaced = 0
-                    jumpRequested = true
+        val iter = pending.iterator()
+        while (iter.hasNext()) {
+            val (target, tick) = iter.next()
+            val age = p.tickCount - tick
+            if (level.getBlockState(target).canBeReplaced()) {
+                // The client predicts the block the moment it uses; if it's gone again the server refused it
+                // (or it never went down), so it is retried on the very next tick.
+                if (age >= 1) {
+                    iter.remove()
+                    lastPlaceTick = 0
+                    nextDelay = 0
+                }
+            } else if (age >= 3) {
+                // Still there after a server round trip: it really was placed.
+                iter.remove()
+                if (target != lastPlacedPos) {
+                    lastPlacedPos = target
+                    bridgeBlocksPlaced++
+                    if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
+                        bridgeBlocksPlaced = 0
+                        jumpRequested = true
+                    }
                 }
             }
-        } else if (p.tickCount - pendingPlacedTick >= 4) {
-            pendingPlacedPos = null
         }
     }
 
