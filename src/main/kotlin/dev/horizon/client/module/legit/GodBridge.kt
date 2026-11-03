@@ -7,6 +7,7 @@ import dev.horizon.client.combat.PlayerState
 import dev.horizon.client.combat.Rng
 import dev.horizon.client.combat.Rotation
 import dev.horizon.client.event.KeyboardInputEvent
+import dev.horizon.client.event.MouseTurnEvent
 import dev.horizon.client.event.Render2DEvent
 import dev.horizon.client.event.Render3DEvent
 import dev.horizon.client.event.TickEvent
@@ -33,21 +34,30 @@ import net.minecraft.world.level.block.Block
 import net.minecraft.world.phys.AABB
 import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.Vec3
+import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Not in the original: GodBridge assist module.
  * Assists with advanced bridging techniques:
  * - Legit: Automatically sneaks at the edge of blocks when moving backwards (Ninja / Fast Bridge).
- * - GodBridge: Places blocks while walking at full speed diagonally without sneaking.
- * Includes Pitch Check, Activation Blocks requirement, Block Count HUD display, and Block Selection (Whitelist/Blacklist).
+ * - GodBridge: Automatically steers & angles the camera (Pitch Lock / Auto-Angle) and places blocks while walking
+ *   at full speed diagonally without sneaking.
+ * Includes Pitch Check, Auto-Angle / Diagonal Snap, Activation Blocks requirement, Block Count HUD display,
+ * and Block Selection (Whitelist/Blacklist).
  */
 class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "scaffold-legit", "fast-bridge-plus")) {
     enum class Mode { LEGIT, GOD_BRIDGE }
     enum class FilterMode { NONE, BLACKLIST, WHITELIST }
+    enum class AngleMode { NONE, SNAP_DIAGONAL, SMOOTH_AIM, HARD_LOCK }
 
     val mode = enum("mode", Mode.GOD_BRIDGE)
 
@@ -57,6 +67,9 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     val edgeDistance = float("edge-distance", 0.18f, 0.05f..0.29f) { mode.value == Mode.LEGIT }
 
     // GodBridge mode settings
+    val autoAngle = enum("auto-angle", AngleMode.SMOOTH_AIM) { mode.value == Mode.GOD_BRIDGE }
+    val aimSpeed = float("aim-speed", 300.0f, 60.0f..600.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value == AngleMode.SMOOTH_AIM }
+    val targetPitch = float("target-pitch", 76.5f, 65.0f..85.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value != AngleMode.NONE }
     val activationBlocks = int("activation-blocks", 0, 0..10) { mode.value == Mode.GOD_BRIDGE }
     val placeDelay = int("place-delay", 0, 0..5) { mode.value == Mode.GOD_BRIDGE }
     val requireRightClick = bool("require-right-click", false) { mode.value == Mode.GOD_BRIDGE }
@@ -64,7 +77,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     // General settings
     val blockCount = bool("block-count", true)
     val pitchCheck = bool("pitch-check", true)
-    val minPitch = float("min-pitch", 60.0f, 30.0f..85.0f) { pitchCheck.value }
+    val minPitch = float("min-pitch", 55.0f, 25.0f..85.0f) { pitchCheck.value }
     val blockSelection = enum("block-selection", FilterMode.NONE)
     val blockList = blocks("blocks", blockList("block.minecraft.tnt", "block.minecraft.sand", "block.minecraft.gravel")) { blockSelection.value != FilterMode.NONE }
 
@@ -73,6 +86,14 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     private var placedCount = 0
     private var lastPlaceTick = 0
     private var lastTargetPos: BlockPos? = null
+    private var currentPlacement: BlockHitResult? = null
+
+    // Legit camera rotation physics variables
+    private var vYaw = 0.0
+    private var vPitch = 0.0
+    private var carryX = 0.0
+    private var carryY = 0.0
+    private var lastNs = 0L
 
     override fun onEnable() = resetState()
     override fun onDisable() = resetState()
@@ -83,6 +104,12 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         placedCount = 0
         lastPlaceTick = 0
         lastTargetPos = null
+        currentPlacement = null
+        vYaw = 0.0
+        vPitch = 0.0
+        carryX = 0.0
+        carryY = 0.0
+        lastNs = 0L
     }
 
     init {
@@ -129,7 +156,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             }
         }
 
-        // Handle GodBridge mode auto-placement
+        // Handle GodBridge mode auto-placement & finding bridge placement
         on<TickEvent> {
             val p = mc.player ?: return@on
             val level = mc.level ?: return@on
@@ -138,16 +165,19 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
 
             if (p.abilities.flying || p.isInLiquid || p.isPassenger || p.isFallFlying) {
                 placedCount = 0
+                currentPlacement = null
                 return@on
             }
 
             if (pitchCheck.value && p.xRot < minPitch.value) {
                 placedCount = 0
+                currentPlacement = null
                 return@on
             }
 
             if (requireRightClick.value && !(PlayerState.physical(mc.options.keyUse) || mc.options.keyUse.isDown)) {
                 placedCount = 0
+                currentPlacement = null
                 return@on
             }
 
@@ -157,19 +187,36 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                 if (found != null) {
                     Inventory.selectHotbar(found.slot)
                 } else {
+                    currentPlacement = null
                     return@on
                 }
             }
 
-            // Raycast check: see if looking at a valid block face to extend the bridge
-            val hit = mc.hitResult as? BlockHitResult ?: return@on
-            if (hit.type != net.minecraft.world.phys.HitResult.Type.BLOCK) return@on
-            val face = hit.direction
-            val placedPos = hit.blockPos.relative(face)
+            // Find best target block to place against
+            val placement = findGodBridgePlacement(p, level)
+            currentPlacement = placement
 
-            // Must be at or slightly below player feet level
-            if (placedPos.y > p.blockY) return@on
-            if (!level.getBlockState(placedPos).canBeReplaced()) return@on
+            if (placement == null) return@on
+
+            // Snap or Hard Lock handling during tick if configured
+            when (autoAngle.value) {
+                AngleMode.SNAP_DIAGONAL -> {
+                    // Snap yaw to nearest 45-degree angle, pitch to targetPitch
+                    val snappedYaw = (p.yRot / 45f).roundToInt() * 45f
+                    p.yRot = snappedYaw
+                    p.xRot = targetPitch.value
+                }
+                AngleMode.HARD_LOCK -> {
+                    val eye = p.eyePosition
+                    val loc = placement.location
+                    val dx = loc.x - eye.x
+                    val dz = loc.z - eye.z
+                    val wantYaw = (Math.toDegrees(atan2(dz, dx)) - 90.0).toFloat()
+                    p.yRot = wantYaw
+                    p.xRot = targetPitch.value
+                }
+                else -> {}
+            }
 
             // Activation blocks check
             if (placedCount < activationBlocks.value) {
@@ -185,10 +232,48 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             // Place block
             if (p.tickCount - lastPlaceTick >= placeDelay.value) {
                 lastPlaceTick = p.tickCount
-                lastTargetPos = placedPos
-                mc.gameMode?.useItemOn(p, InteractionHand.MAIN_HAND, hit)
-                PlaceBoxes.add(placedPos, Theme.primary or (0xFF shl 24), Theme.primary or (0x44 shl 24), Animation.Fade, Render.BOTH)
+                lastTargetPos = placement.blockPos.relative(placement.direction)
+                mc.gameMode?.useItemOn(p, InteractionHand.MAIN_HAND, placement)
+                PlaceBoxes.add(placement.blockPos.relative(placement.direction), Theme.primary or (0xFF shl 24), Theme.primary or (0x44 shl 24), Animation.Fade, Render.BOTH)
             }
+        }
+
+        // Smooth aiming on MouseTurnEvent for legit steering
+        on<MouseTurnEvent> {
+            val p = mc.player ?: return@on
+            if (mode.value != Mode.GOD_BRIDGE || autoAngle.value != AngleMode.SMOOTH_AIM) return@on
+            val placement = currentPlacement ?: return@on
+            val now = System.nanoTime()
+            val dt = if (lastNs == 0L) 0.0 else ((now - lastNs) / 1e9).coerceIn(0.0, 0.05)
+            lastNs = now
+
+            val eye = p.eyePosition
+            val aim = placement.location
+            val dx = aim.x - eye.x
+            val dz = aim.z - eye.z
+            val wantYaw = Math.toDegrees(atan2(dz, dx)) - 90.0
+            val wantPitch = targetPitch.value.toDouble()
+            val errYaw = Mth.wrapDegrees(wantYaw - p.yRot)
+            val errPitch = wantPitch - p.xRot
+
+            val maxSpeed = aimSpeed.value.toDouble()
+            val stiffness = 160.0
+            val damping = 0.85
+            val c = 2.0 * sqrt(stiffness) * damping
+
+            vYaw = (vYaw + (stiffness * errYaw - c * vYaw) * dt).coerceIn(-maxSpeed, maxSpeed)
+            vPitch = (vPitch + (stiffness * errPitch - c * vPitch) * dt).coerceIn(-maxSpeed, maxSpeed)
+
+            val f = mc.options.sensitivity().get() * 0.6 + 0.2
+            val perCount = f * f * f * 8.0
+            val step = perCount * 0.15
+            carryX += vYaw * dt / step
+            carryY += vPitch * dt / step
+            val countsX = carryX.toInt()
+            val countsY = carryY.toInt()
+            carryX -= countsX
+            carryY -= countsY
+            if (countsX != 0 || countsY != 0) p.turn(countsX * perCount, countsY * perCount)
         }
 
         // Render Block Count in center of screen
@@ -210,6 +295,42 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             val bp = lastTargetPos ?: return@on
             PlaceBoxes.add(bp, Theme.primary or (0xFF shl 24), Theme.primary or (0x22 shl 24), Animation.Static, Render.BOTH)
         }
+    }
+
+    /**
+     * Determines the optimal block position and face to place against for GodBridging.
+     * Checks what the crosshair is currently pointing at, or searches directly under/ahead of the player's movement.
+     */
+    private fun findGodBridgePlacement(p: Player, level: Level): BlockHitResult? {
+        // 1. If currently aiming at a valid placeable block face, use it!
+        val hit = mc.hitResult as? BlockHitResult
+        if (hit != null && hit.type == net.minecraft.world.phys.HitResult.Type.BLOCK) {
+            val placedPos = hit.blockPos.relative(hit.direction)
+            if (placedPos.y <= p.blockY && level.getBlockState(placedPos).canBeReplaced()) {
+                return hit
+            }
+        }
+
+        // 2. Otherwise calculate based on movement direction and blocks below feet
+        val feet = BlockPos.containing(p.position())
+        val underFeet = feet.below()
+
+        // If under feet is air, find adjacent solid block to place from
+        val candidates = ArrayList<BlockHitResult>()
+        for (d in Direction.Plane.HORIZONTAL) {
+            val neighbor = underFeet.relative(d)
+            if (!level.getBlockState(neighbor).canBeReplaced()) {
+                val hitVec = Vec3.atCenterOf(neighbor).add(Vec3(d.opposite.step()).scale(0.5))
+                candidates += BlockHitResult(hitVec, d.opposite, neighbor, false)
+            }
+        }
+
+        if (candidates.isNotEmpty()) {
+            val eye = p.eyePosition
+            return candidates.minByOrNull { eye.distanceToSqr(it.location) }
+        }
+
+        return null
     }
 
     private fun activeForLegit(p: Player, keys: Input): Boolean {
