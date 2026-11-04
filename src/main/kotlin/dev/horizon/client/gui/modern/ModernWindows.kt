@@ -10,7 +10,9 @@ import dev.horizon.client.module.ClickGuiModule
 import dev.horizon.client.module.Modules
 import dev.horizon.client.render.Canvas
 import dev.horizon.client.render.Colors
+import dev.horizon.client.render.Blur
 import dev.horizon.client.render.Easing
+import dev.horizon.client.render.Theme
 import dev.horizon.client.setting.Bind
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -70,7 +72,10 @@ object ModernWindows : Screen(Component.literal("horizon-windows")) {
         this.mouseY = mouseY.toFloat()
     }
 
-    override fun extractBackground(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {}
+    override fun extractBackground(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
+        // From the main menu there's no world behind: the menu's own panorama instead.
+        if (only != null && mc.level == null) extractPanorama(graphics, delta)
+    }
 
     override fun isPauseScreen() = false
 
@@ -91,6 +96,7 @@ object ModernWindows : Screen(Component.literal("horizon-windows")) {
 
     override fun removed() {
         super.removed()
+        leaveMenu()
         mc.textInputManager().stopTextInput(this)
         Ui.focused = null
         menu = null
@@ -134,8 +140,14 @@ object ModernWindows : Screen(Component.literal("horizon-windows")) {
         val fade = if (closingAt != 0L) 1f - ((now - closingAt) / 180f).coerceIn(0f, 1f) else 1f
         if (closingAt != 0L && fade <= 0f) {
             closingAt = 0L
-            super.onClose()
+            val to = back
+            if (only != null) mc.gui.setScreen(to) else super.onClose()
             return
+        }
+        // Out of a world nothing else moves the theme along or captures what the panes blur.
+        if (only != null && mc.player == null) {
+            Theme.update()
+            Blur.capture()
         }
         Ui.mx = (mouseX - ox) / k
         Ui.my = (mouseY - oy) / k
@@ -155,8 +167,8 @@ object ModernWindows : Screen(Component.literal("horizon-windows")) {
         pose.scale(k, k)
         Ui.ambient(0f, 0f)
         Canvas.alpha = fade
-        topNav(inT, 1)
-        for (p in order.toList()) window(p, panes.indexOf(p), fade)
+        if (only == null) topNav(inT, 1)
+        for (p in order.toList()) if (only == null || p === only) window(p, if (only != null) 0 else panes.indexOf(p), fade)
         menu?.let { if (!it.draw()) menu = null }
         pose.popMatrix()
         Canvas.alpha = 1f
@@ -677,6 +689,40 @@ object ModernWindows : Screen(Component.literal("horizon-windows")) {
             f.type(c)
         }
         return true
+    }
+
+    // ---- from the main menu ----
+
+    /** The one pane shown when opened from the main menu, and the screen Esc goes back to. */
+    private var only: Pane? = null
+    private var back: Screen? = null
+    private var inGameX = 0f
+    private var inGameY = 0f
+
+    /**
+     * Not in the original: the main menu's Proxies button. Only the proxies pane shows, centred over the menu's
+     * panorama, so a proxy can be picked (and is used) before the first connection; Esc goes back to [from]. The pane's
+     * in-game place is put back afterwards.
+     */
+    fun openProxies(from: Screen) {
+        val p = ProxiesPane
+        if (only == null) {
+            inGameX = p.x
+            inGameY = p.y
+        }
+        only = p
+        back = from
+        p.x = (SW - p.w) / 2f
+        p.y = (SH - p.h) / 2f
+        mc.gui.setScreen(this)
+    }
+
+    private fun leaveMenu() {
+        val p = only ?: return
+        p.x = inGameX
+        p.y = inGameY
+        only = null
+        back = null
     }
 
     /** Called by the classic UI's top bar and the new GUI: open with [focus] pulsing. */
