@@ -6,6 +6,7 @@ import dev.horizon.client.combat.Rng
 import dev.horizon.client.combat.Rotation
 import dev.horizon.client.combat.Scheduler
 import dev.horizon.client.config.Friends
+import dev.horizon.client.event.MouseTurnEvent
 import dev.horizon.client.module.Modules
 import dev.horizon.client.module.basic.Sprint
 import dev.horizon.client.module.legit.Teams
@@ -60,9 +61,79 @@ class AuraTargets(private val aura: Aura) {
     fun select(previous: Entity?): Entity? {
         val best = findBest()
         if (previous != null && aura.sort.value != Aura.Sort.FOV) {
-            if (best !is Projectile && !isInvalid(previous)) return previous
+            if (best !is Projectile && !isInvalid(previous)) {
+                if (aura.dynamicSwitch.value) (inFront(previous) ?: turnedTo(previous))?.let { return it }
+                return previous
+            }
         }
         return best
+    }
+
+    private var lastSwitch = 0L
+
+    /** Not more than one switch every [SWITCH_HOLD_MS], so two players side by side don't flicker. */
+    private fun switched(e: Entity?): Entity? {
+        if (e != null) lastSwitch = System.nanoTime()
+        return e
+    }
+
+    private fun holding() = System.nanoTime() - lastSwitch < SWITCH_HOLD_MS * 1_000_000L
+
+    /**
+     * Not in the original ([Aura.dynamicSwitch]): another valid target under the crosshair, nearer than anything else
+     * it touches: it stepped in front of the held one (Legit can't hit through it), or you put the crosshair on it.
+     */
+    private fun inFront(current: Entity): Entity? {
+        val p = mc.player ?: return null
+        val level = mc.level ?: return null
+        if (holding()) return null
+        val eye = p.eyePosition
+        val end = eye.add(p.lookAngle.scale(searchRange().toDouble()))
+        val wall = level.clip(ClipContext(eye, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, p))
+        val reach = if (wall.type == HitResult.Type.MISS) end else wall.location
+        var front: Entity? = null
+        var frontDist = Double.MAX_VALUE
+        for (e in level.entitiesForRendering()) {
+            if (e !is LivingEntity || isInvalid(e)) continue
+            val hit = e.boundingBox.inflate(e.pickRadius.toDouble()).clip(eye, reach).orElse(null) ?: continue
+            val d = eye.distanceToSqr(hit)
+            if (d < frontDist) {
+                frontDist = d
+                front = e
+            }
+        }
+        return switched(front?.takeIf { it !== current })
+    }
+
+    /**
+     * Not in the original ([Aura.dynamicSwitch]): while your own mouse is moving, another valid target within
+     * [SWITCH_CONE] degrees of the crosshair and clearly nearer to it than the held one, as when you flick onto
+     * someone. Aura asks every frame too, before Legit's aim turns the view back towards the held target.
+     */
+    fun turnedTo(current: Entity): Entity? {
+        val p = mc.player ?: return null
+        val level = mc.level ?: return null
+        if (holding() || !MouseTurnEvent.movedWithinMs(MOUSE_MS)) return null
+        val eye = p.eyePosition
+        val look = p.lookAngle
+        var best: Entity? = null
+        var bestAngle = SWITCH_CONE
+        for (e in level.entitiesForRendering()) {
+            if (e === current || e !is LivingEntity || isInvalid(e)) continue
+            val a = angleTo(eye, look, e)
+            if (a < bestAngle) {
+                bestAngle = a
+                best = e
+            }
+        }
+        if (best == null || bestAngle + SWITCH_MARGIN >= angleTo(eye, look, current)) return null
+        return switched(best)
+    }
+
+    /** Degrees between the view and the middle of [e]'s box. */
+    private fun angleTo(eye: Vec3, look: Vec3, e: Entity): Double {
+        val to = e.boundingBox.center.subtract(eye).normalize()
+        return Math.toDegrees(kotlin.math.acos(to.dot(look).coerceIn(-1.0, 1.0)))
     }
 
     private fun findBest(): Entity? {
@@ -179,6 +250,11 @@ class AuraTargets(private val aura: Aura) {
     }
 
     private companion object {
+        const val SWITCH_CONE = 20.0
+        const val SWITCH_MARGIN = 8.0
+        const val SWITCH_HOLD_MS = 300L
+        /** Mouse movement this recent counts as you turning (Legit's own turns aren't counted). */
+        const val MOUSE_MS = 150L
         val BOT_ARMOR = setOf(Items.LEATHER_BOOTS, Items.LEATHER_LEGGINGS, Items.LEATHER_CHESTPLATE, Items.LEATHER_HELMET,
             Items.IRON_BOOTS, Items.IRON_LEGGINGS, Items.IRON_CHESTPLATE, Items.IRON_HELMET)
     }
