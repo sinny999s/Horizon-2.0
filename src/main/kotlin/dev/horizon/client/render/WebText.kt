@@ -8,12 +8,14 @@ import org.joml.Matrix3x2f
 import org.joml.Vector2f
 import java.awt.Color
 import java.awt.Font
+import java.awt.GraphicsEnvironment
 import java.awt.RenderingHints
 import java.awt.font.FontRenderContext
 import java.awt.geom.AffineTransform
 import java.awt.font.TextAttribute
 import java.awt.font.TextLayout
 import java.awt.image.BufferedImage
+import java.text.AttributedString
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -65,7 +67,7 @@ class WebText(file: String, private val size: Float, letterSpacing: Float = 0f) 
         val t = NameProtect.protect(text)
         widths[t]?.let { return it }
         if (widths.size > 4096) widths.clear()
-        return (TextLayout(t, font, frc).advance / scale).also { widths[t] = it }
+        return (layout(t).advance / scale).also { widths[t] = it }
     }
 
     /** [text] from [x], its capitals centred on [cy]. */
@@ -118,10 +120,28 @@ class WebText(file: String, private val size: Float, letterSpacing: Float = 0f) 
         }
     }
 
+    /**
+     * [text] laid out in the font, any character it has no glyph for (a server's ✔, ❤, ⚔) taken from a system font that
+     * has one, at the same size, instead of drawn as a box.
+     */
+    private fun layout(text: String): TextLayout {
+        if (font.canDisplayUpTo(text) == -1) return TextLayout(text, font, frc)
+        val s = AttributedString(text)
+        s.addAttribute(TextAttribute.FONT, font)
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            val n = Character.charCount(cp)
+            if (!font.canDisplay(cp)) fallback(cp)?.let { s.addAttribute(TextAttribute.FONT, it.deriveFont(font.size2D), i, i + n) }
+            i += n
+        }
+        return TextLayout(s.iterator, frc)
+    }
+
     private fun raster(text: String, quarter: Int): Raster {
         val key = "$quarter$text"
         rasters[key]?.let { return it }
-        val layout = TextLayout(text, font, frc)
+        val layout = layout(text)
         val q = quarter / 4f
         val b = layout.getPixelBounds(frc, q, 0f)
         val pad = 1
@@ -165,6 +185,16 @@ class WebText(file: String, private val size: Float, letterSpacing: Float = 0f) 
 
         /** Coverage thickened towards the browser's text (DirectWrite and Skia draw light-on-dark text heavier). */
         private val BOOST = IntArray(256) { (255f * (it / 255f).pow(0.62f)).roundToInt() }
+
+        private val fallbacks = HashMap<Int, Font?>()
+
+        /** A system font with a glyph for [cp]: Windows' symbol fonts first, then anything installed. */
+        private fun fallback(cp: Int): Font? = fallbacks.getOrPut(cp) {
+            FALLBACK_NAMES.map { Font(it, Font.PLAIN, 12) }.firstOrNull { it.family == it.name && it.canDisplay(cp) }
+                ?: GraphicsEnvironment.getLocalGraphicsEnvironment().allFonts.firstOrNull { it.canDisplay(cp) }?.deriveFont(12f)
+        }
+
+        private val FALLBACK_NAMES = listOf("Segoe UI Symbol", "Segoe UI Emoji", "Segoe UI", "Arial Unicode MS", "DejaVu Sans")
 
         private fun load(name: String): Font =
             WebText::class.java.getResourceAsStream("/assets/${HorizonClient.ID}/fonts/$name.ttf")!!.use { Font.createFont(Font.TRUETYPE_FONT, it) }

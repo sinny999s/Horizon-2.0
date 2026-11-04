@@ -20,6 +20,7 @@ import dev.horizon.client.hud.widgets.PhaseWidget
 import dev.horizon.client.hud.widgets.PingWidget
 import dev.horizon.client.hud.widgets.PlayerListWidget
 import dev.horizon.client.hud.widgets.PotionsWidget
+import dev.horizon.client.hud.widgets.ScoreboardWidget
 import dev.horizon.client.hud.widgets.PvpResourcesWidget
 import dev.horizon.client.hud.widgets.SpeedWidget
 import dev.horizon.client.hud.widgets.StaffWidget
@@ -52,6 +53,7 @@ object Hud {
             ArrayListWidget,
             SessionStatsWidget,
             KeystrokesWidget,
+            ScoreboardWidget,
         )
     }
 
