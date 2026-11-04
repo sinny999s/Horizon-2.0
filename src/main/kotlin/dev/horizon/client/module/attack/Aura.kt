@@ -168,6 +168,8 @@ class Aura : Module("aura", Categories.ATTACK) {
     val sprint = enum("sprint", Sprint.NORMAL)
     val esp = enum("esp", Esp.COMETS)
     val sort = enum("sort", Sort.Distance)
+    /** Not in the original: let go of the held target for whoever is under the crosshair or the mouse turns towards. */
+    val dynamicSwitch = bool("dynamic-switch", false) { sort.value != Sort.FOV }
     val targets = group("targets", GroupMode.BOOLS)
     val antibot = bool("antibot", true, parent = targets.value)
     val players = bool("players", true, parent = targets.value)
@@ -220,7 +222,13 @@ class Aura : Module("aura", Categories.ATTACK) {
         on<PostTasksEvent> { if (backTrack.value) backTracker.postTasks() }
         on<CrosshairEvent> { e -> overrideCrosshair(e) }
         on<Render3DEvent> { render() }
-        on<MouseTurnEvent> { if (effectiveRotation() === LegitRotation) LegitRotation.frame(this) }
+        on<MouseTurnEvent> {
+            if (effectiveRotation() === LegitRotation) {
+                val t = target
+                if (dynamicSwitch.value && t != null && sort.value != Sort.FOV) finder.turnedTo(t)?.let { target = it }
+                LegitRotation.frame(this)
+            }
+        }
     }
 
     /** The original's `jv.Y`: the target ESP, then (with back-track, whatever the ESP) the back-tracked ghost. */
