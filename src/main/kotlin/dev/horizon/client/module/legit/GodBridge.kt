@@ -23,6 +23,7 @@ import net.minecraft.core.Direction
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket
 import net.minecraft.util.Mth
 import net.minecraft.world.InteractionHand
+import net.minecraft.world.entity.ai.attributes.Attributes
 import net.minecraft.world.entity.player.Input
 import net.minecraft.world.entity.player.Player
 import net.minecraft.world.item.BlockItem
@@ -34,6 +35,7 @@ import net.minecraft.world.phys.BlockHitResult
 import net.minecraft.world.phys.HitResult
 import net.minecraft.world.phys.Vec3
 import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
@@ -43,14 +45,16 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.tan
 
 /**
  * Not in the original: GodBridge assist module.
  * Assists with advanced bridging techniques:
  * - Legit: Automatically sneaks at the edge of blocks when moving backwards (Ninja / Fast Bridge).
- * - GodBridge: Automates a hand-played god bridge. The camera is turned with ordinary mouse counts onto the
- *   diagonal angle, and blocks are placed by vanilla's own right-click on whatever the crosshair is on (no custom
- *   rotation packets, no fabricated hit positions); the 7-block jump is a real input press.
+ * - GodBridge: Automates a hand-played god bridge. The camera is held still (or turned with ordinary mouse counts
+ *   onto the set angle), blocks are placed by vanilla's own right-click on whatever the crosshair is on (no custom
+ *   rotation packets, no fabricated hit positions), and the jumps are real input presses timed by [BridgePlanner]:
+ *   at a fixed angle every few blocks no tick lands where a click can build, and a jump is what carries it over.
  * Includes Pitch Check, Auto-Angle / Diagonal Snap, Activation Blocks requirement, Block Count HUD display,
  * and Block Selection (Whitelist/Blacklist).
  */
@@ -69,7 +73,11 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     // GodBridge mode settings
     val autoAngle = enum("auto-angle", AngleMode.NONE) { mode.value == Mode.GOD_BRIDGE }
     val aimSpeed = float("aim-speed", 300.0f, 60.0f..600.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value == AngleMode.SMOOTH_DIAGONAL }
-    val targetPitch = float("target-pitch", 76.5f, 65.0f..85.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value != AngleMode.NONE }
+    /**
+     * For a diagonal stance (73-77 holds); facing straight back, the pitch that reaches as far along the bridge is
+     * used instead (74 -> 78.5, where 77.5-80 holds).
+     */
+    val targetPitch = float("target-pitch", 74.0f, 65.0f..85.0f) { mode.value == Mode.GOD_BRIDGE && autoAngle.value != AngleMode.NONE }
     val autoJump = bool("auto-jump", true) { mode.value == Mode.GOD_BRIDGE }
     val jumpInterval = int("jump-interval", 7, 3..15) { mode.value == Mode.GOD_BRIDGE && autoJump.value }
     val activationBlocks = int("activation-blocks", 3, 0..10) { mode.value == Mode.GOD_BRIDGE }
@@ -95,8 +103,11 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
     private val pending = ArrayList<Pair<BlockPos, Int>>()
     /** Ticks to wait before the next use, re-rolled after each one like a human's click rhythm. */
     private var nextDelay = 0
-    /** Set when a block-interval jump is due; applied to the next input tick as a real jump key press. */
+    /** Set by this tick's jump plan; applied to this tick's input as a real jump key press. */
     private var jumpRequested = false
+    private val probe = BlockPos.MutableBlockPos()
+    /** The diagonal heading's current lean, see [sideNudge]. */
+    private var nudge = 0.0
 
     // Legit camera rotation physics variables
     private var vYaw = 0.0
@@ -120,6 +131,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         pending.clear()
         nextDelay = 0
         jumpRequested = false
+        nudge = 0.0
         vYaw = 0.0
         vPitch = 0.0
         carryX = 0.0
@@ -212,6 +224,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             val level = mc.level ?: return@on
             if (mc.gui.screen() != null) return@on
             if (mode.value != Mode.GOD_BRIDGE) return@on
+            jumpRequested = false
 
             if (p.abilities.flying || p.isInLiquid || p.isPassenger || p.isFallFlying) {
                 resetState()
@@ -228,7 +241,6 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                     placedCount = 0
                     bridgeBlocksPlaced = 0
                 }
-                jumpRequested = false
                 vYaw = 0.0
                 vPitch = 0.0
                 return@on
@@ -252,31 +264,11 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
 
             countPending(p, level)
 
-            if (p.tickCount - lastPlaceTick < nextDelay) return@on
-            if (p.isUsingItem) return@on
-
-            val hit = mc.hitResult as? BlockHitResult ?: return@on
-            if (hit.type != HitResult.Type.BLOCK) return@on
-            if (!canBridgeOn(p, level, hit)) return@on
-
-            // The real thing a right click would do: vanilla startUseItem on the current crosshair target.
-            val target = hit.blockPos.relative(hit.direction)
-            pending += target to p.tickCount
-            lastPlaceTick = p.tickCount
-            nextDelay = placeDelay.value + Rng.int(0, 1)
-            (mc as MinecraftAccessor).horizon_startUseItem()
-
-            // Counted as it is placed, so the jump for the interval's last block starts right away: a jump a
-            // few ticks late has already carried the player past the block it needs to land on. A refused
-            // placement takes the count back in countPending.
-            if (target != lastPlacedPos) {
-                lastPlacedPos = target
-                bridgeBlocksPlaced++
-                if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
-                    bridgeBlocksPlaced = 0
-                    jumpRequested = true
-                }
-            }
+            // Vanilla's own right click picks the crosshair at the tick's position just before handling the keys;
+            // the one left from the last frame lags part of a tick behind, which is a lot at the bridge's edge.
+            (mc as MinecraftAccessor).horizon_pick(1f)
+            place(p, level)
+            jumpRequested = autoJump.value && p.onGround() && planJump(p, level)
         }
 
         // Camera steering on MouseTurnEvent: ordinary mouse-count turns, so sensitivity steps are respected.
@@ -306,14 +298,29 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
 
             // Nearest diagonal / axis heading and the configured pitch. The camera never chases the bridge's edge:
             // the pitch only settles on the set angle, and placing is left to wherever the crosshair really is.
-            val wantYaw = ((p.yRot / 45f).roundToInt() * 45f).toDouble()
-            val wantPitch = targetPitch.value.toDouble()
-            val errYaw = Mth.wrapDegrees((wantYaw - p.yRot).toFloat()).toDouble()
-            val errPitch = wantPitch - p.xRot
+            val heading = (p.yRot / 45f).roundToInt() * 45
+            val diagonal = heading % 90 != 0
+            val wantYaw = heading + if (diagonal) sideNudge(p, heading.toDouble()) else 0.0
+            val wantPitch = if (diagonal) targetPitch.value.toDouble() else straightPitch(targetPitch.value.toDouble())
+            var errYaw = Mth.wrapDegrees((wantYaw - p.yRot).toFloat()).toDouble()
+            var errPitch = wantPitch - p.xRot
 
             val f = mc.options.sensitivity().get() * 0.6 + 0.2
             val perCount = f * f * f * 8.0
             val step = perCount * 0.15
+
+            // Within a mouse count of the angle is as close as a mouse gets: hold still there rather than stepping
+            // back and forth across it like no hand does (and a flicker of pitch moves where the crosshair reaches).
+            if (abs(errYaw) < step) {
+                errYaw = 0.0
+                vYaw = 0.0
+                carryX = 0.0
+            }
+            if (abs(errPitch) < step) {
+                errPitch = 0.0
+                vPitch = 0.0
+                carryY = 0.0
+            }
 
             if (angle == AngleMode.SMOOTH_DIAGONAL) {
                 val maxSpeed = aimSpeed.value.toDouble()
@@ -359,16 +366,76 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         }
     }
 
+    /** Right-clicks through vanilla when the crosshair is on a face that extends the bridge. */
+    private fun place(p: Player, level: Level) {
+        if (p.tickCount - lastPlaceTick < nextDelay) return
+        if (p.isUsingItem) return
+        val hit = mc.hitResult as? BlockHitResult ?: return
+        if (hit.type != HitResult.Type.BLOCK) return
+        if (!canBridgeOn(p, level, hit)) return
+
+        // The real thing a right click would do: vanilla startUseItem on the current crosshair target.
+        val target = hit.blockPos.relative(hit.direction)
+        pending += target to p.tickCount
+        lastPlaceTick = p.tickCount
+        nextDelay = placeDelay.value + Rng.int(0, 1)
+        (mc as MinecraftAccessor).horizon_startUseItem()
+        // Counted for the jump interval; a refused placement takes the count back in countPending.
+        if (target != lastPlacedPos) {
+            lastPlacedPos = target
+            bridgeBlocksPlaced++
+        }
+    }
+
+    /**
+     * Whether to jump this tick: when walking on would leave the bridge behind and a jump keeps it going, or, every
+     * [jumpInterval] blocks, when a jump is safe anyway (a player's own rhythm).
+     */
+    private fun planJump(p: Player, level: Level): Boolean {
+        val v = p.deltaMovement
+        val s = BridgePlanner.State(p.x, p.y, p.z, v.x, v.y, v.z, true)
+        val look = p.lookAngle
+        val strafe = p.xxa.toDouble()
+        val forward = p.zza.toDouble()
+        val yaw = p.yRot.toDouble()
+        val ground = BridgePlanner.push(strafe, forward, yaw, p.speed.toDouble())
+        val air = BridgePlanner.push(strafe, forward, yaw, if (p.isSprinting) 0.026 else 0.02)
+        val params = BridgePlanner.Params(
+            look.x, look.y, look.z, ground[0], ground[1], air[0], air[1],
+            eye = p.eyeHeight.toDouble(), halfWidth = p.bbWidth / 2.0, height = p.bbHeight.toDouble(),
+            reach = p.blockInteractionRange(),
+            jumpPower = p.getAttributeValue(Attributes.JUMP_STRENGTH) + p.jumpBoostPower,
+            gravity = p.gravity,
+            // The click delay's random extra tick is assumed every time, so the plan never counts on a quick one.
+            clickGap = max(1, placeDelay.value + 1),
+            nextClickIn = max(0, nextDelay - (p.tickCount - lastPlaceTick)),
+        )
+        val solid = { x: Int, y: Int, z: Int ->
+            probe.set(x, y, z)
+            !level.getBlockState(probe).getCollisionShape(level, probe).isEmpty
+        }
+        if (BridgePlanner.shouldJump(s, params, solid)) {
+            bridgeBlocksPlaced = 0
+            return true
+        }
+        if (bridgeBlocksPlaced >= jumpInterval.value && BridgePlanner.jumpIsSafe(s, params, solid)) {
+            bridgeBlocksPlaced = 0
+            return true
+        }
+        return false
+    }
+
     /**
      * Whether a right click on [hit] would extend the bridge: a solid, non-interactive block whose touching tile is
-     * free, at or below the walking level and close to the feet, so the module never builds walls or towers up.
+     * free, on its side (so the bridge stays flat), below the walking level and close to the feet, so the module never
+     * builds walls, steps or towers.
      */
     private fun canBridgeOn(p: Player, level: Level, hit: BlockHitResult): Boolean {
         val clicked = level.getBlockState(hit.blockPos)
         if (clicked.canBeReplaced()) return false
         val target = hit.blockPos.relative(hit.direction)
         if (!level.getBlockState(target).canBeReplaced()) return false
-        if (hit.direction == Direction.DOWN) return false
+        if (hit.direction == Direction.DOWN || hit.direction == Direction.UP) return false
         if (target.y.toDouble() >= p.y) return false
         if (target.y < p.blockY - 2) return false
         // Only click plain blocks, never a chest, door, crafting table etc. next to the bridge.
@@ -376,7 +443,39 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         return true
     }
 
-    /** Counts a sent use once its block shows up locally, and queues the auto-jump every [jumpInterval] blocks. */
+    /** The pitch that, looking straight back along the bridge, reaches as far along it as [diagonal] does at 45 degrees. */
+    private fun straightPitch(diagonal: Double) = Math.toDegrees(atan(tan(Math.toRadians(diagonal)) * sqrt(2.0)))
+
+    /**
+     * Degrees added to a diagonal heading so the walk carries the player onto the half of the block away from where
+     * the crosshair runs. Looking 45 degrees off the bridge, the crosshair also moves sideways as it goes down: from the
+     * middle of the block it runs off the side during a jump, from the far half it stays on the bridge. A player sets
+     * this up by standing on the corner; here the walk leans over by a degree and a half until the player is there.
+     * Kept as it was while in the air, so the camera doesn't swing back and forth over a jump.
+     */
+    private fun sideNudge(p: Player, heading: Double): Double {
+        if (!p.onGround()) return nudge
+        nudge = 0.0
+        val move = BridgePlanner.push(p.xxa.toDouble(), p.zza.toDouble(), heading, 1.0)
+        val len = hypot(move[0], move[1])
+        if (len < 1e-3) return nudge
+        // Across the walk, and which way along it the crosshair drifts.
+        val sx = -move[1] / len
+        val sz = move[0] / len
+        val r = Math.toRadians(heading)
+        val drift = -sin(r) * sx + cos(r) * sz
+        if (abs(drift) < 0.1) return nudge
+        val column = p.onPos
+        val off = (p.x - (column.x + 0.5)) * sx + (p.z - (column.z + 0.5)) * sz
+        val want = if (drift > 0) -SIDE else SIDE
+        if (abs(off - want) < 0.1) return nudge
+        val turned = BridgePlanner.push(p.xxa.toDouble(), p.zza.toDouble(), heading + 1.0, 1.0)
+        val sideways = turned[0] * sx + turned[1] * sz
+        nudge = if ((want > off) == (sideways > 0)) NUDGE else -NUDGE
+        return nudge
+    }
+
+    /** Counts a sent use once its block shows up locally, and takes back the count of one that was refused. */
     private fun countPending(p: Player, level: Level) {
         val iter = pending.iterator()
         while (iter.hasNext()) {
@@ -455,5 +554,11 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         val s = sin(rad)
         val c = cos(rad)
         return doubleArrayOf(ns * c - nf * s, nf * c + ns * s)
+    }
+
+    private companion object {
+        /** How far off the block's middle a diagonal bridger stands, see [sideNudge]. */
+        const val SIDE = 0.3
+        const val NUDGE = 1.5
     }
 }
