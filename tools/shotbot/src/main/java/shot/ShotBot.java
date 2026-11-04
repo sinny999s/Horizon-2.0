@@ -222,6 +222,9 @@ public final class ShotBot implements ClientModInitializer {
 					held.put(k, Integer.parseInt(a[2]));
 				}
 				case "note" -> PacketLog.note(line.substring(5));
+				case "fakeheld" -> PacketLog.fakeHeld(mc, a[1], a[2]);
+				case "fakemove" -> PacketLog.fakeMove(mc, a[1], Double.parseDouble(a[2]), Double.parseDouble(a[3]), Double.parseDouble(a[4]));
+				case "fakeinvis" -> PacketLog.fakeInvisible(mc, a[1], Boolean.parseBoolean(a[2]));
 				case "fakeplayer" -> PacketLog.fakePlayer(mc, a[1], Double.parseDouble(a[2]), Double.parseDouble(a[3]), Double.parseDouble(a[4]),
 					a.length > 5 ? Float.parseFloat(a[5]) : 0f);
 				case "enums" -> {
