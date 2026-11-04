@@ -7,10 +7,10 @@ out/
 # Runtime Game Directory (worlds, server logs, accounts, private configs)
 run/
 
-# Test harness build caches & test outputs
-tools/shotbot/.gradle/
-tools/shotbot/build/
-tools/test-out/
+# Dev-only: the test harness (ShotBot, scripts) and the ClickGUI design mockup stay local; the repo is the client
+tools/
+design/
+.horizon-cache/
 
 # IDE & Editor files
 .idea/
