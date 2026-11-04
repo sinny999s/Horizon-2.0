@@ -1,3 +1,0 @@
-title 40
-kmodules horizon-modules.json
-quit
