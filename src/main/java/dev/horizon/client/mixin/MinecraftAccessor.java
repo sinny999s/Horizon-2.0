@@ -14,6 +14,9 @@ public interface MinecraftAccessor {
 	@Invoker("startUseItem")
 	void horizon_startUseItem();
 
+	@Invoker("pick")
+	void horizon_pick(float partialTick);
+
 	@Accessor("missTime")
 	void horizon_setMissTime(int missTime);
 }

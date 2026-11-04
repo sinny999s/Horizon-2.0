@@ -1,0 +1,38 @@
+# GodBridge over the void, the classic stance: facing straight back (yaw 0) at pitch 79, S only, the camera left
+# alone (auto-angle NONE): only the module's clicks and jumps, 15 s of bridging.
+# Setup: python tools/testcfg.py setup godbridge activation-blocks=0 auto-angle=NONE auto-jump=true jump-interval=7 block-selection=NONE
+# Run:   sh tools/run-test.sh tools/examples/godbridge-straight.txt
+# Check: no "fell out of the world"; the jump count, the final position, then the stone placed at the bridge's level
+#        (-61), above it and below it (both "No blocks were filled"). Look at mid.png and end.png.
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule send_command_feedback true
+cmd gamerule advance_time false
+cmd gamerule spawn_mobs false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd scoreboard objectives add jumps minecraft.custom:minecraft.jump
+cmd tp @s 2000.5 -60 2001.5 0 79
+wait 60
+cmd forceload add 1980 1880 2020 2010
+wait 60
+cmd fill 1995 -64 1880 2005 -61 2010 air
+cmd fill 2000 -61 1998 2000 -61 2002 stone
+cmd give @s stone 64
+cmd scoreboard players set @s jumps 0
+wait 20
+keydown S
+wait 150
+shot mid
+wait 150
+keyup S
+wait 20
+shot end
+cmd scoreboard players get @s jumps
+cmd data get entity @s Pos
+cmd fill 1999 -61 1880 2001 -61 1997 air replace stone
+cmd fill 1999 -60 1880 2001 -40 1997 air replace stone
+cmd fill 1999 -64 1880 2001 -62 1997 air replace stone
+wait 5
+quit
