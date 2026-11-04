@@ -23,13 +23,14 @@ import net.minecraft.client.gui.screens.multiplayer.SafetyScreen
 import net.minecraft.client.gui.screens.options.OptionsScreen
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen
 import net.minecraft.client.input.MouseButtonEvent
+import dev.horizon.client.gui.modern.ModernWindows
 import net.minecraft.network.chat.Component
 import kotlin.math.floor
 
 /**
  * Not in the original: the client's own title screen ([Menus]). It extends vanilla's, so vanilla's checks for the title
- * screen still hold, but draws none of it: the animated backdrop, the original's logo in the theme colours, a greeting, four
- * buttons (vanilla's actions), and the versions and Mojang's copyright line (opening the credits, as vanilla's does) in
+ * screen still hold, but draws none of it: the animated backdrop, the original's logo in the theme colours, a greeting, five
+ * buttons (vanilla's actions, and Proxies), and the versions and Mojang's copyright line (opening the credits, as vanilla's does) in
  * the bottom corners. Everything fades and slides in the first time a menu is shown, not again when coming back to it
  * from the screens it opens.
  */
@@ -39,6 +40,8 @@ class MainMenu : TitleScreen(), MenuScreen {
     private val buttons = listOf(
         MenuButton("Singleplayer") { mc.gui.setScreen(SelectWorldScreen(this)) },
         MenuButton("Multiplayer") { mc.gui.setScreen(if (mc.options.skipMultiplayerWarning) JoinMultiplayerScreen(this) else SafetyScreen(this)) },
+        // Not in vanilla: the Windows screen's proxies, so one can be picked before the first connection.
+        MenuButton("Proxies") { ModernWindows.openProxies(this) },
         MenuButton("Options") { mc.gui.setScreen(OptionsScreen(this, mc.options)) },
         MenuButton("Quit", Menus::back) { mc.stop() },
     )
@@ -87,7 +90,7 @@ class MainMenu : TitleScreen(), MenuScreen {
         val bw = 150f
         val bh = 20f
         val gap = 5f
-        val block = LOGO_H + 24f + bh * 3 + gap * 2
+        val block = LOGO_H + 24f + bh * 4 + gap * 3
         var y = floor(((h - block) / 2f).coerceAtLeast(8f))
 
         var k = entrance(0)
@@ -101,18 +104,18 @@ class MainMenu : TitleScreen(), MenuScreen {
         y += 18f
 
         for ((i, b) in buttons.withIndex()) {
-            k = entrance(2 + minOf(i, 2))
+            k = entrance(2 + minOf(i, 3))
             Canvas.alpha = k
             val slide = (1f - k) * 8f
             when (i) {
-                0, 1 -> b.draw(cx - bw / 2f, y + slide, bw, bh, mouseX, mouseY)
-                2 -> b.draw(cx - bw / 2f, y + slide, (bw - gap) / 2f, bh, mouseX, mouseY)
+                0, 1, 2 -> b.draw(cx - bw / 2f, y + slide, bw, bh, mouseX, mouseY)
+                3 -> b.draw(cx - bw / 2f, y + slide, (bw - gap) / 2f, bh, mouseX, mouseY)
                 else -> b.draw(cx + gap / 2f, y + slide, (bw - gap) / 2f, bh, mouseX, mouseY)
             }
-            if (i < 2) y += bh + gap
+            if (i < 3) y += bh + gap
         }
 
-        k = entrance(5)
+        k = entrance(6)
         Canvas.alpha = k
         val font = Fonts.medium75
         font.draw(versions, 6f, h - 11f, Colors.withAlpha(-1, 0.4f))
