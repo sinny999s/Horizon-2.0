@@ -162,6 +162,37 @@ final class PacketLog {
 		note("fakeplayer " + name + " id " + p.getId());
 	}
 
+	/** The fake player called [name] (client side only, so server commands can't reach it). */
+	private static RemotePlayer fake(Minecraft mc, String name) {
+		for (var e : mc.level.entitiesForRendering())
+			if (e instanceof RemotePlayer r && r.getGameProfile().name().equals(name)) return r;
+		throw new IllegalArgumentException("no fake player " + name);
+	}
+
+	/** fakeheld <name> <item id>: what the fake player holds in its main hand. */
+	static void fakeHeld(Minecraft mc, String name, String item) {
+		var id = net.minecraft.resources.Identifier.parse(item);
+		var it = net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(id);
+		fake(mc, name).setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new net.minecraft.world.item.ItemStack(it));
+		note("fakeheld " + name + " " + item);
+	}
+
+	/** fakemove <name> x y z. */
+	static void fakeMove(Minecraft mc, String name, double x, double y, double z) {
+		RemotePlayer p = fake(mc, name);
+		p.setPos(x, y, z);
+		p.xo = x;
+		p.yo = y;
+		p.zo = z;
+		note("fakemove " + name);
+	}
+
+	/** fakeinvis <name> true|false. */
+	static void fakeInvisible(Minecraft mc, String name, boolean on) {
+		fake(mc, name).setInvisible(on);
+		note("fakeinvis " + name + " " + on);
+	}
+
 	static void close() throws IOException {
 		stop();
 	}
