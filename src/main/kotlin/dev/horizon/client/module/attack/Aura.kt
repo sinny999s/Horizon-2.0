@@ -24,6 +24,8 @@ import dev.horizon.client.module.Esp
 import dev.horizon.client.module.Module
 import dev.horizon.client.module.Modules
 import dev.horizon.client.module.basic.Sprint as SprintModule
+import dev.horizon.client.module.legit.FireballDeflect
+import dev.horizon.client.module.legit.PearlSave
 import dev.horizon.client.module.rage.Blink
 import dev.horizon.client.module.rage.ElytraTarget
 import dev.horizon.client.module.rage.MaceElytraTarget
@@ -223,7 +225,8 @@ class Aura : Module("aura", Categories.ATTACK) {
         on<CrosshairEvent> { e -> overrideCrosshair(e) }
         on<Render3DEvent> { render() }
         on<MouseTurnEvent> {
-            if (effectiveRotation() === LegitRotation) {
+            // Not in the original: a fireball deflect or a pearl throw has the camera meanwhile.
+            if (effectiveRotation() === LegitRotation && !Modules.get<FireballDeflect>().busy && !Modules.get<PearlSave>().busy) {
                 val t = target
                 if (dynamicSwitch.value && t != null && sort.value != Sort.FOV) finder.turnedTo(t)?.let { target = it }
                 LegitRotation.frame(this)
@@ -327,7 +330,10 @@ class Aura : Module("aura", Categories.ATTACK) {
             // The camera itself turns (LegitRotation, every frame): nothing silent is sent, and a hit lands only where
             // the crosshair is, never through a wall.
             rotation = Rotation(p.yRot, p.xRot)
-            onRotated(attackReady, rayHitsTarget(t, rotation, range.value, true))
+            // The hit reaches the server before this tick's look does, so it is judged by the last look sent: hit only
+            // when that one is on the target too (turning hard up close, it can still point past it: NCP's direction).
+            val sentOnTarget = rayHitsTarget(t, Rotation(Rotation.lastYaw, Rotation.lastPitch), range.value, true)
+            onRotated(attackReady, sentOnTarget && rayHitsTarget(t, rotation, range.value, true))
             return
         }
         rotation = if (fov.value == 1) Rotation(p.yRot, p.xRot) else mode.rotate(this, t, rotation, attackReady)

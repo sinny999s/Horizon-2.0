@@ -1,0 +1,57 @@
+# Threat Alerts, with chat lines on so the log shows them. Your bed is set 3 blocks south of you; one fake enemy
+# (client-side, so it's driven with ShotBot's fakeheld / fakemove / fakeinvis rather than server commands).
+# Expect, in order: Enemy has a fireball / (nothing for stone) / Enemy has TNT / Enemy has a bow / Enemy went invisible
+# / Enemy is at your bed / A block at your bed was broken / (nothing after Enemy joins your team and takes a fireball).
+# Setup: python tools/testcfg.py setup threat-alerts chat=true -- teams enabled=true scoreboard-team=true
+# Run:   sh tools/run-test.sh tools/examples/threat-alerts.txt
+# Check: grep -a "Threat" tools/test-out/threat-alerts.log, and the SAY marker lines in between.
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule send_command_feedback true
+cmd gamerule advance_time false
+cmd gamerule spawn_mobs false
+cmd time set 6000
+cmd kill @e[type=!player]
+cmd tp @s 7000.5 -60 7000.5 0 0
+wait 60
+cmd setblock 7000 -60 7003 red_bed[facing=south,part=foot]
+cmd setblock 7000 -60 7004 red_bed[facing=south,part=head]
+wait 60
+fakeplayer Enemy 7000.5 -60 7025.5 180
+wait 40
+cmd say step fireball
+fakeheld Enemy minecraft:fire_charge
+wait 20
+cmd say step stone
+fakeheld Enemy minecraft:stone
+wait 20
+cmd say step tnt
+fakeheld Enemy minecraft:tnt
+wait 20
+cmd say step bow
+fakeheld Enemy minecraft:bow
+wait 20
+cmd say step invisible
+fakeinvis Enemy true
+wait 20
+cmd say step at bed
+fakemove Enemy 7002.5 -60 7006.5
+wait 20
+cmd say step block broken
+cmd setblock 7001 -60 7003 white_wool
+wait 10
+cmd setblock 7001 -60 7003 air
+wait 20
+cmd say step teammate fireball
+cmd team add t
+cmd team join t @a
+cmd team join t Enemy
+fakeheld Enemy minecraft:stone
+wait 10
+fakeheld Enemy minecraft:fire_charge
+wait 20
+cmd say step done
+shot end
+wait 5
+quit
