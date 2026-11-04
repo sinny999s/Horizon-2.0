@@ -1,0 +1,70 @@
+# Pearl Save (with Clutch on): a 1-wide bridge 60 blocks above the ground, survival with resistance so a miss doesn't
+# end the run, 16 pearls.
+# A: sprint-jump off the bridge's end (too far out for Clutch): a pearl lands back on the bridge (Pos y 1).
+# B: jump off the side: Clutch's block catches it and no pearl is used.
+# C: hop off a ledge 3 blocks up: no pearl.
+# Setup: python tools/testcfg.py setup pearl-save -- clutch -- criticals enabled=false
+# Run:   sh tools/run-test.sh tools/examples/pearl-save.txt
+# Check: A ends at y 1 (on the bridge) with 15 pearls left; B ends at y 1 with 15; C ends at -60 with 15.
+# Restore: python tools/testcfg.py restore
+title 40
+world
+cmd gamerule send_command_feedback true
+cmd gamerule advance_time false
+cmd gamerule spawn_mobs false
+cmd time set 6000
+cmd kill @e[type=!player]
+move 800 450
+cmd tp @s 6000.5 -60 6030.5 180 0
+wait 60
+cmd fill 6000 0 5990 6000 0 6010 stone
+cmd gamemode survival
+cmd effect give @s resistance infinite 255 true
+cmd give @s stone 64
+cmd give @s ender_pearl 16
+wait 20
+# A: sprint-jump off the north end
+cmd tp @s 6000.5 1 5991.2 180 0
+wait 20
+keydown LCONTROL
+keydown W
+wait 3
+keydown SPACE
+wait 2
+keyup SPACE
+wait 8
+keyup W
+keyup LCONTROL
+wait 60
+shot a
+cmd data get entity @s Pos
+cmd clear @s ender_pearl 0
+# B: jump off the east side
+cmd tp @s 6000.5 1 6004.5 180 0
+wait 20
+keydown D
+keydown SPACE
+wait 2
+keyup SPACE
+wait 5
+keyup D
+wait 60
+shot b
+cmd data get entity @s Pos
+cmd clear @s ender_pearl 0
+# C: a ledge 3 blocks above the grass
+cmd fill 6020 -58 6000 6020 -58 6004 stone
+cmd tp @s 6020.5 -57 6002.5 180 0
+wait 20
+keydown D
+keydown SPACE
+wait 2
+keyup SPACE
+wait 5
+keyup D
+wait 40
+shot c
+cmd data get entity @s Pos
+cmd clear @s ender_pearl 0
+wait 5
+quit

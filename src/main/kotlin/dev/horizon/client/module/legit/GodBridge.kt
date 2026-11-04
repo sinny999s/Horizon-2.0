@@ -277,6 +277,8 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             val level = mc.level ?: return@on
             val angle = autoAngle.value
             if (mode.value != Mode.GOD_BRIDGE || angle == AngleMode.NONE) return@on
+            // A fireball deflect or a pearl throw has the camera meanwhile.
+            if (Modules.get<FireballDeflect>().busy || Modules.get<PearlSave>().busy) return@on
 
             // Only steer when activated and actively bridging backwards
             if (!activated) return@on
