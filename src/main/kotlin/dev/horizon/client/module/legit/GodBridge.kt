@@ -3,6 +3,7 @@ package dev.horizon.client.module.legit
 import dev.horizon.client.combat.Inventory
 import dev.horizon.client.combat.Movement
 import dev.horizon.client.combat.PlayerState
+import dev.horizon.client.combat.Rotation
 import dev.horizon.client.combat.Rng
 import dev.horizon.client.event.KeyboardInputEvent
 import dev.horizon.client.event.MouseTurnEvent
@@ -264,11 +265,24 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             lastPlaceTick = p.tickCount
             nextDelay = placeDelay.value + Rng.int(0, 1)
             (mc as MinecraftAccessor).horizon_startUseItem()
+
+            // Counted as it is placed, so the jump for the interval's last block starts right away: a jump a
+            // few ticks late has already carried the player past the block it needs to land on. A refused
+            // placement takes the count back in countPending.
+            if (target != lastPlacedPos) {
+                lastPlacedPos = target
+                bridgeBlocksPlaced++
+                if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
+                    bridgeBlocksPlaced = 0
+                    jumpRequested = true
+                }
+            }
         }
 
         // Camera steering on MouseTurnEvent: ordinary mouse-count turns, so sensitivity steps are respected.
         on<MouseTurnEvent> {
             val p = mc.player ?: return@on
+            val level = mc.level ?: return@on
             val angle = autoAngle.value
             if (mode.value != Mode.GOD_BRIDGE || angle == AngleMode.NONE) return@on
 
@@ -290,9 +304,10 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             val dt = if (lastNs == 0L) 0.0 else ((now - lastNs) / 1e9).coerceIn(0.0, 0.05)
             lastNs = now
 
-            // Nearest diagonal / axis heading and the configured pitch.
+            // Nearest diagonal / axis heading and the configured pitch, or the bridge's edge face once reachable.
             val wantYaw = ((p.yRot / 45f).roundToInt() * 45f).toDouble()
-            val wantPitch = targetPitch.value.toDouble()
+            val edge = edgeFacePitch(p, level, wantYaw)
+            val wantPitch = edge ?: targetPitch.value.toDouble()
             val errYaw = Mth.wrapDegrees((wantYaw - p.yRot).toFloat()).toDouble()
             val errPitch = wantPitch - p.xRot
 
@@ -300,7 +315,7 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
             val perCount = f * f * f * 8.0
             val step = perCount * 0.15
 
-            if (angle == AngleMode.SMOOTH_DIAGONAL) {
+            if (angle == AngleMode.SMOOTH_DIAGONAL && edge == null) {
                 val maxSpeed = aimSpeed.value.toDouble()
                 val stiffness = 160.0
                 val damping = 0.85
@@ -310,7 +325,11 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                 carryX += vYaw * dt / step
                 carryY += vPitch * dt / step
             } else {
-                // SNAP / HARD_LOCK: close the whole error at once, still in whole mouse counts.
+                // SNAP / HARD_LOCK, and settling onto the bridge's edge face in any mode: that last flick is only a
+                // few degrees, but a spring would still be on its way while the face is already in reach, so close
+                // the whole error at once, still in whole mouse counts.
+                vYaw = 0.0
+                vPitch = 0.0
                 carryX += errYaw / step
                 carryY += errPitch / step
             }
@@ -361,6 +380,51 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
         return true
     }
 
+    /**
+     * When the eyes are already past the end of the bridge, the exact point on that block's outer face that a
+     * right click would build from. Aiming there is what a player does by hand: the plain diagonal angle only
+     * lands on that face for a sliver of a tick, so the camera settles onto the face instead.
+     */
+    private fun edgeFacePitch(p: Player, level: Level, yawDeg: Double): Double? {
+        val dx = p.deltaMovement.x
+        val dz = p.deltaMovement.z
+        val len = hypot(dx, dz)
+        if (len < 0.02) return null
+        val bb = p.boundingBox
+        // The eyes as they are drawn this frame, so the pitch tracks the face exactly as the player moves between
+        // ticks instead of lagging a tick behind a target that moves a quarter of a block at a time.
+        val pt = mc.deltaTracker.getGameTimeDeltaPartialTick(true).toDouble()
+        val eye = p.getEyePosition(pt.toFloat())
+        // Any block still holding the player up, not just the one under the centre of the feet.
+        val supports = LinkedHashSet<BlockPos>()
+        for (x in doubleArrayOf(bb.minX, bb.maxX)) for (z in doubleArrayOf(bb.minZ, bb.maxZ)) {
+            supports += BlockPos.containing(x, p.y - 0.5, z)
+        }
+        for (base in supports) {
+            if (level.getBlockState(base).canBeReplaced()) continue
+            for (d in arrayOf(Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST)) {
+                if (d.stepX * dx + d.stepZ * dz < 0.3 * len) continue
+                if (!level.getBlockState(base.relative(d)).canBeReplaced()) continue
+                val c = Vec3.atCenterOf(base)
+                // Eyes must be beyond the face plane, otherwise the ray would hit the top of the block instead.
+                if ((eye.x - c.x) * d.stepX + (eye.z - c.z) * d.stepZ < 0.5 + 0.01) continue
+                val ray = Math.toRadians(yawDeg)
+                val hx = -sin(ray)
+                val hz = cos(ray)
+                val facing = hx * d.stepX + hz * d.stepZ
+                // The view has to look back toward the face, and the yaw is never touched: the strafe keys are
+                // relative to it, so turning would walk the player off the bridge line.
+                if (facing > -0.2) continue
+                val dist = (eye.x - c.x) * d.stepX + (eye.z - c.z) * d.stepZ - 0.5
+                val along = dist / -facing
+                // Aim at the middle of the face's height, the most forgiving point.
+                val drop = eye.y - c.y
+                return Math.toDegrees(atan2(drop, along)).coerceIn(40.0, 88.0)
+            }
+        }
+        return null
+    }
+
     /** Counts a sent use once its block shows up locally, and queues the auto-jump every [jumpInterval] blocks. */
     private fun countPending(p: Player, level: Level) {
         val iter = pending.iterator()
@@ -374,18 +438,12 @@ class GodBridge : Module("godbridge", Categories.LEGIT, listOf("god-bridge", "sc
                     iter.remove()
                     lastPlaceTick = 0
                     nextDelay = 0
+                    if (bridgeBlocksPlaced > 0) bridgeBlocksPlaced--
+                    lastPlacedPos = null
                 }
             } else if (age >= 3) {
                 // Still there after a server round trip: it really was placed.
                 iter.remove()
-                if (target != lastPlacedPos) {
-                    lastPlacedPos = target
-                    bridgeBlocksPlaced++
-                    if (autoJump.value && bridgeBlocksPlaced >= jumpInterval.value) {
-                        bridgeBlocksPlaced = 0
-                        jumpRequested = true
-                    }
-                }
             }
         }
     }
